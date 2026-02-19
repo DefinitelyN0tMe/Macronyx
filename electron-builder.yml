@@ -1,0 +1,40 @@
+appId: com.macronyx.app
+productName: Macronyx
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.*'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+asarUnpack:
+  - resources/**
+  - node_modules/uiohook-napi/**
+win:
+  executableName: Macronyx
+  target:
+    - nsis
+    - portable
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+  allowToChangeInstallationDirectory: true
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSInputMonitoringUsageDescription: "Macronyx needs input monitoring to record macros."
+    NSAccessibilityUsageDescription: "Macronyx needs accessibility access to control mouse and keyboard."
+  target:
+    - dmg
+    - zip
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: DefinitelyN0tMe
+  category: Utility
+npmRebuild: true
