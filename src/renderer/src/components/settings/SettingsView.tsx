@@ -348,7 +348,7 @@ function AdvancedSettings(): JSX.Element {
       <SettingRow label="Version" description="Macronyx v1.0.0">
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.0.0</span>
       </SettingRow>
-      <SettingRow label="Portable Mode" description="Detected automatically when 'portable' file exists next to the executable">
+      <SettingRow label="Portable Mode" description="Create an empty file named 'portable' (no extension) next to Macronyx.exe to store data locally">
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Not active</span>
       </SettingRow>
       <div style={{ marginTop: 20 }}>

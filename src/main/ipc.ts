@@ -112,6 +112,17 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const macro = await macroStorage!.load(macroId)
       if (!macro) return { success: false, error: 'Macro not found' }
 
+      // Always apply the current global default playback settings so that
+      // changes in Settings → Playback take effect immediately for all macros.
+      const currentSettings = await settingsStorage!.get()
+      macro.playbackSettings = {
+        speed: currentSettings.playback.defaultSpeed,
+        repeatCount: currentSettings.playback.defaultRepeatCount,
+        repeatDelay: currentSettings.playback.defaultRepeatDelay,
+        humanize: currentSettings.playback.defaultHumanize,
+        humanizeAmount: currentSettings.playback.defaultHumanizeAmount
+      }
+
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
       player!.play(macro, (state: PlaybackState) => {
         mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
