@@ -8,10 +8,10 @@ export function formatTime(ms: number): string {
 
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
-  const seconds = ms / 1000
-  if (seconds < 60) return `${seconds.toFixed(1)}s`
-  const minutes = Math.floor(seconds / 60)
-  const secs = Math.round(seconds % 60)
+  const totalSeconds = ms / 1000
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
+  const minutes = Math.floor(totalSeconds / 60)
+  const secs = Math.floor(totalSeconds % 60)
   return `${minutes}m ${secs}s`
 }
 

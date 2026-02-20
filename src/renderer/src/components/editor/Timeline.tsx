@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState, useEffect } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { getEventTypeColor } from '../../utils/eventHelpers'
 import { getKeyLabel } from '../../utils/keyLabels'
@@ -14,17 +14,34 @@ export function Timeline(): JSX.Element {
   const selectEvents = useEditorStore((s) => s.selectEvents)
   const deleteEvents = useEditorStore((s) => s.deleteEvents)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(2000)
+
+  // Track container width for viewport culling
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width)
+      }
+    })
+    observer.observe(el)
+    setContainerWidth(el.clientWidth)
+    return () => observer.disconnect()
+  }, [])
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault()
-        setZoom(zoom + (e.deltaY > 0 ? -10 : 10))
+        const currentZoom = useEditorStore.getState().zoom
+        setZoom(currentZoom + (e.deltaY > 0 ? -10 : 10))
       } else {
-        setScrollOffset(scrollOffset + e.deltaY * 0.5)
+        const currentOffset = useEditorStore.getState().scrollOffset
+        setScrollOffset(currentOffset + e.deltaY * 0.5)
       }
     },
-    [zoom, scrollOffset, setZoom, setScrollOffset]
+    [setZoom, setScrollOffset]
   )
 
   const handleKeyDown = useCallback(
@@ -62,7 +79,7 @@ export function Timeline(): JSX.Element {
       tabIndex={0}
     >
       {/* Ruler */}
-      <TimelineRuler zoom={zoom} duration={macro.duration} scrollOffset={scrollOffset} />
+      <TimelineRuler zoom={zoom} duration={macro.duration} scrollOffset={scrollOffset} viewportWidth={containerWidth} />
 
       {/* Mouse Track */}
       <div className="timeline-track">
@@ -76,7 +93,7 @@ export function Timeline(): JSX.Element {
               scrollOffset={scrollOffset}
               isSelected={selectedEventIds.includes(event.id)}
               onSelect={() => selectEvents([event.id])}
-              totalWidth={totalWidth}
+              viewportWidth={containerWidth}
             />
           ))}
         </div>
@@ -94,7 +111,7 @@ export function Timeline(): JSX.Element {
               scrollOffset={scrollOffset}
               isSelected={selectedEventIds.includes(event.id)}
               onSelect={() => selectEvents([event.id])}
-              totalWidth={totalWidth}
+              viewportWidth={containerWidth}
             />
           ))}
         </div>
@@ -106,11 +123,13 @@ export function Timeline(): JSX.Element {
 function TimelineRuler({
   zoom,
   duration,
-  scrollOffset
+  scrollOffset,
+  viewportWidth
 }: {
   zoom: number
   duration: number
   scrollOffset: number
+  viewportWidth: number
 }): JSX.Element {
   const totalSeconds = Math.ceil(duration / 1000) + 2
   const tickInterval = zoom < 30 ? 5 : zoom < 80 ? 2 : 1
@@ -118,7 +137,7 @@ function TimelineRuler({
   const ticks: JSX.Element[] = []
   for (let s = 0; s <= totalSeconds; s += tickInterval) {
     const left = (s * zoom) - scrollOffset + 80
-    if (left < 40 || left > 2000) continue
+    if (left < 40 || left > viewportWidth + 50) continue
     ticks.push(
       <div
         key={s}
@@ -147,19 +166,19 @@ function TimelineEventChip({
   scrollOffset,
   isSelected,
   onSelect,
-  totalWidth: _totalWidth
+  viewportWidth
 }: {
   event: MacroEvent
   zoom: number
   scrollOffset: number
   isSelected: boolean
   onSelect: () => void
-  totalWidth: number
+  viewportWidth: number
 }): JSX.Element {
   const left = (event.timestamp / 1000) * zoom - scrollOffset
   const color = getEventTypeColor(event.type)
 
-  if (left < -50 || left > 2000) return <></>
+  if (left < -50 || left > viewportWidth + 50) return null as unknown as JSX.Element
 
   const renderContent = (): JSX.Element => {
     switch (event.type) {

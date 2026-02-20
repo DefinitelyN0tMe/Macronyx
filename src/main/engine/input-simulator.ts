@@ -20,7 +20,7 @@ interface InputSimulator {
 class WindowsSimulator implements InputSimulator {
   private proc: ChildProcess | null = null
   private ready = false
-  private queue: { resolve: () => void; reject: (err: Error) => void }[] = []
+  private queue: { resolve: () => void; reject: (err: Error) => void; done: boolean }[] = []
 
   constructor() {
     this.init()
@@ -109,14 +109,18 @@ Write-Output "READY"
     this.proc.stdin?.write(setupScript + '\n')
 
     this.proc.stdout?.on('data', (data: Buffer) => {
-      const text = data.toString().trim()
+      const text = data.toString()
       if (text.includes('READY')) {
         this.ready = true
       }
-      // Resolve pending commands
-      if (text.includes('OK')) {
+      // Count how many "OK" responses arrived in this chunk and resolve that many pending commands
+      const okCount = (text.match(/\bOK\b/g) || []).length
+      for (let i = 0; i < okCount; i++) {
         const pending = this.queue.shift()
-        if (pending) pending.resolve()
+        if (pending && !pending.done) {
+          pending.done = true
+          pending.resolve()
+        }
       }
     })
 
@@ -127,6 +131,8 @@ Write-Output "READY"
     this.proc.on('close', () => {
       this.proc = null
       this.ready = false
+      // Invalidate singleton so a new process is created on next use
+      singleton = null
     })
   }
 
@@ -136,17 +142,21 @@ Write-Output "READY"
         reject(new Error('PowerShell process not available'))
         return
       }
-      this.queue.push({ resolve, reject })
+      const entry = { resolve, reject, done: false }
+      this.queue.push(entry)
       this.proc.stdin.write(cmd + '; Write-Output "OK"\n')
 
-      // Timeout to prevent hanging
+      // Timeout to prevent hanging — only resolve if not already done
       setTimeout(() => {
-        const idx = this.queue.indexOf(this.queue.find(q => q.resolve === resolve)!)
-        if (idx !== -1) {
-          this.queue.splice(idx, 1)
+        if (!entry.done) {
+          entry.done = true
+          const idx = this.queue.indexOf(entry)
+          if (idx !== -1) {
+            this.queue.splice(idx, 1)
+          }
           resolve() // Don't reject, just move on
         }
-      }, 100)
+      }, 200)
     })
   }
 
@@ -282,7 +292,7 @@ class MacOSSimulator implements InputSimulator {
 
   async mouseDown(button: 'left' | 'right' | 'middle'): Promise<void> {
     if (this.hasClic) {
-      const cmd = button === 'right' ? 'dd' : 'dd'
+      const cmd = button === 'right' ? 'rd' : 'dd'
       execSync(`cliclick ${cmd}:.`, { timeout: 1000 })
     }
   }

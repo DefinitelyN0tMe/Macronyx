@@ -14,7 +14,6 @@ import type { AppStatus, Macro } from '@shared/types'
 
 export function AppShell(): JSX.Element {
   const activeView = useAppStore((s) => s.activeView)
-  const status = useAppStore((s) => s.status)
   const loadMacros = useMacroStore((s) => s.loadMacros)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
 

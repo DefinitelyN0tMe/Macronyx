@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { getEventTypeLabel, getEventTypeColor } from '../../utils/eventHelpers'
 import { getKeyLabel } from '../../utils/keyLabels'
@@ -206,13 +207,35 @@ function InspectorField({
   type: string
   onChange: (value: string) => void
 }): JSX.Element {
+  const [localValue, setLocalValue] = useState(String(value))
+  const [isFocused, setIsFocused] = useState(false)
+
+  // Sync from external value when not focused
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(String(value))
+    }
+  }, [value, isFocused])
+
+  const commit = (): void => {
+    if (localValue !== String(value)) {
+      onChange(localValue)
+    }
+    setIsFocused(false)
+  }
+
   return (
     <div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
       <input
         type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={localValue}
+        onFocus={() => setIsFocused(true)}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+        }}
         style={{
           width: '100%',
           padding: '6px 8px',

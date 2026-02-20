@@ -294,6 +294,10 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
 }
 
 export function cleanupIpc(): void {
+  if (recorder) {
+    try { recorder.stop() } catch { /* may already be stopped */ }
+    recorder = null
+  }
   if (player) {
     player.destroy()
     player = null

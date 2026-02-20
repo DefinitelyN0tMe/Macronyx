@@ -42,9 +42,13 @@ export function MousePathPreview(): JSX.Element {
     )
     if (mouseEvents.length === 0) return
 
-    // Calculate scale
-    const maxX = Math.max(...mouseEvents.map((e) => e.x ?? 0), 1920)
-    const maxY = Math.max(...mouseEvents.map((e) => e.y ?? 0), 1080)
+    // Calculate scale (use reduce to avoid stack overflow on large arrays)
+    let maxX = 1920
+    let maxY = 1080
+    for (const e of mouseEvents) {
+      if ((e.x ?? 0) > maxX) maxX = e.x ?? 0
+      if ((e.y ?? 0) > maxY) maxY = e.y ?? 0
+    }
     const scaleX = (width - 20) / maxX
     const scaleY = (height - 20) / maxY
     const scale = Math.min(scaleX, scaleY)

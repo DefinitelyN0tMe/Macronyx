@@ -10,6 +10,11 @@ export class Player {
   private humanizer = new Humanizer()
 
   async play(macro: Macro, onProgress: (state: PlaybackState) => void): Promise<void> {
+    // Guard against concurrent plays
+    if (this.isPlaying) {
+      this.stop()
+      await new Promise((r) => setTimeout(r, 50))
+    }
     this.isPlaying = true
     this.isPaused = false
     this.onProgress = onProgress
