@@ -71,7 +71,10 @@ public struct KEYBDINPUT {
 
 public class NativeInput {
     [DllImport("user32.dll")]
-    public static extern bool SetCursorPos(int X, int Y);
+    public static extern bool SetProcessDPIAware();
+
+    [DllImport("user32.dll")]
+    public static extern int GetSystemMetrics(int nIndex);
 
     [DllImport("user32.dll")]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
@@ -82,8 +85,31 @@ public class NativeInput {
     [DllImport("user32.dll")]
     public static extern int MapVirtualKey(int uCode, int uMapType);
 
+    private static bool dpiAware = false;
+    private static int screenW = 0;
+    private static int screenH = 0;
+
+    public static void EnsureDPIAware() {
+        if (!dpiAware) {
+            SetProcessDPIAware();
+            dpiAware = true;
+            screenW = GetSystemMetrics(0); // SM_CXSCREEN
+            screenH = GetSystemMetrics(1); // SM_CYSCREEN
+        }
+    }
+
     public static void MoveMouse(int x, int y) {
-        SetCursorPos(x, y);
+        EnsureDPIAware();
+        // Use SendInput with ABSOLUTE coordinates (0-65535 normalized)
+        // This bypasses DPI scaling issues entirely
+        int normX = (int)((x * 65536L) / screenW);
+        int normY = (int)((y * 65536L) / screenH);
+        INPUT[] input = new INPUT[1];
+        input[0].type = 0; // INPUT_MOUSE
+        input[0].data.mi.dx = normX;
+        input[0].data.mi.dy = normY;
+        input[0].data.mi.dwFlags = 0x0001 | 0x8000; // MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE
+        SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
     }
 
     public static void MouseEvent(int flags, int data) {
@@ -189,7 +215,10 @@ Write-Output "READY"
   }
 
   async mouseScroll(deltaY: number): Promise<void> {
-    const amount = Math.round(deltaY * 120)
+    // Windows WHEEL_DELTA: positive = scroll UP, negative = scroll DOWN
+    // uiohook rotation: positive = scroll DOWN
+    // So we negate: -deltaY * WHEEL_DELTA(120)
+    const amount = Math.round(-deltaY * 120)
     this.sendFireAndForget(`[NativeInput]::MouseEvent(0x0800, ${amount})`)
   }
 

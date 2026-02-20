@@ -1,6 +1,6 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { v4 as uuid } from 'uuid'
-import { IPC, DEFAULT_PLAYBACK_SETTINGS } from '../shared/constants'
+import { IPC } from '../shared/constants'
 import type { Macro, MacroEvent, AppSettings, PlaybackState } from '../shared/types'
 import { Recorder } from './engine/recorder'
 import { Player } from './engine/player'
@@ -8,6 +8,7 @@ import { HotkeyManager } from './engine/hotkeys'
 import { MacroStorage } from './storage/macros'
 import { SettingsStorage } from './storage/settings'
 import { ProfileStorage } from './storage/profiles'
+import { appState } from './app-state'
 
 let recorder: Recorder | null = null
 let player: Player | null = null
@@ -69,6 +70,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       recorder!.stop()
       const events = [...currentRecordingEvents]
       const duration = events.length > 0 ? events[events.length - 1].timestamp : 0
+      // Use user's default playback settings from saved settings
+      const userSettings = await settingsStorage!.get()
       const macro: Macro = {
         id: uuid(),
         name: `Recording ${new Date().toLocaleString()}`,
@@ -80,7 +83,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         tags: [],
         folder: '',
         hotkey: '',
-        playbackSettings: { ...DEFAULT_PLAYBACK_SETTINGS }
+        playbackSettings: {
+          speed: userSettings.playback.defaultSpeed,
+          repeatCount: userSettings.playback.defaultRepeatCount,
+          repeatDelay: userSettings.playback.defaultRepeatDelay,
+          humanize: userSettings.playback.defaultHumanize,
+          humanizeAmount: userSettings.playback.defaultHumanizeAmount
+        }
       }
       await macroStorage!.save(macro)
       currentRecordingEvents = []
@@ -217,6 +226,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const updated = await settingsStorage!.set(settings)
       // Re-register hotkeys when settings change
       setupHotkeys(mainWindow, updated)
+      // Update minimize-to-tray behavior in shared state
+      appState.minimizeToTray = updated.general.minimizeToTray
       return { success: true, settings: updated }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -306,4 +317,11 @@ export function cleanupIpc(): void {
     hotkeyManager.unregisterAll()
     hotkeyManager = null
   }
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  if (!settingsStorage) {
+    settingsStorage = new SettingsStorage()
+  }
+  return settingsStorage.get()
 }

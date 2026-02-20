@@ -125,7 +125,10 @@ export class Recorder {
   private handleWheel = (e: UiohookWheelEvent): void => {
     if (!this.isRecording) return
     const { timestamp, delay } = this.getTimings()
-    const scrollY = e.rotation * (e.direction === 3 ? 1 : -1)
+    // uiohook: rotation > 0 = scroll down, direction 3 = vertical
+    // Store raw rotation with direction sign for playback
+    const scrollY = e.direction === 3 ? e.rotation : 0
+    const scrollX = e.direction !== 3 ? e.rotation : 0
     this.addEvent({
       id: uuid(),
       type: 'mouse_scroll',
@@ -133,7 +136,7 @@ export class Recorder {
       delay,
       x: e.x,
       y: e.y,
-      scrollDelta: { x: 0, y: scrollY }
+      scrollDelta: { x: scrollX, y: scrollY }
     })
   }
 

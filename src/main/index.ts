@@ -1,8 +1,9 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import { registerIpcHandlers, cleanupIpc } from './ipc'
+import { registerIpcHandlers, cleanupIpc, getAppSettings } from './ipc'
 import { TrayManager } from './tray'
+import { appState } from './app-state'
 
 let mainWindow: BrowserWindow | null = null
 let trayManager: TrayManager | null = null
@@ -25,13 +26,17 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
-  })
-
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // Handle minimizeToTray: intercept window close and hide instead
+  mainWindow.on('close', (event) => {
+    if (!appState.isQuitting && appState.minimizeToTray) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -41,18 +46,33 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createWindow()
 
   if (mainWindow) {
     registerIpcHandlers(mainWindow)
     trayManager = new TrayManager(mainWindow)
     trayManager.create()
+
+    // Load settings for startup behavior
+    const settings = await getAppSettings()
+    appState.minimizeToTray = settings.general.minimizeToTray
+
+    // Handle startMinimized
+    mainWindow.on('ready-to-show', () => {
+      if (settings.general.startMinimized) {
+        // Don't show the window — it stays hidden, accessible via tray
+      } else {
+        mainWindow?.show()
+      }
+    })
   }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
+    } else {
+      mainWindow?.show()
     }
   })
 })
@@ -64,6 +84,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  appState.isQuitting = true
   cleanupIpc()
   trayManager?.destroy()
 })

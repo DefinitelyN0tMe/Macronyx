@@ -147,6 +147,10 @@ export class Player {
         }
         case 'mouse_scroll': {
           if (event.scrollDelta) {
+            // Move mouse to scroll position first
+            if (event.x !== undefined && event.y !== undefined) {
+              await sim.moveMouse(event.x, event.y)
+            }
             await sim.mouseScroll(event.scrollDelta.y)
           }
           break
