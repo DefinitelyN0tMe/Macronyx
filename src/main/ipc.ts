@@ -1,5 +1,7 @@
-import { ipcMain, BrowserWindow, dialog } from 'electron'
+import { ipcMain, BrowserWindow, dialog, app } from 'electron'
 import { v4 as uuid } from 'uuid'
+import * as path from 'path'
+import * as fs from 'fs'
 import { IPC } from '../shared/constants'
 import type { Macro, MacroEvent, AppSettings, PlaybackState } from '../shared/types'
 import { Recorder } from './engine/recorder'
@@ -242,6 +244,32 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       return { success: true, settings: updated }
     } catch (err) {
       return { success: false, error: String(err) }
+    }
+  })
+
+  // Portable mode
+  ipcMain.handle(IPC.PORTABLE_STATUS, () => {
+    try {
+      const markerPath = path.join(path.dirname(app.getPath('exe')), 'portable')
+      return { active: fs.existsSync(markerPath), path: markerPath }
+    } catch {
+      return { active: false, path: '' }
+    }
+  })
+
+  ipcMain.handle(IPC.PORTABLE_TOGGLE, async (_e, enable: boolean) => {
+    try {
+      const markerPath = path.join(path.dirname(app.getPath('exe')), 'portable')
+      if (enable) {
+        fs.writeFileSync(markerPath, '', 'utf-8')
+      } else {
+        if (fs.existsSync(markerPath)) {
+          fs.unlinkSync(markerPath)
+        }
+      }
+      return { success: true, active: fs.existsSync(markerPath) }
+    } catch (err) {
+      return { success: false, error: String(err), active: false }
     }
   })
 

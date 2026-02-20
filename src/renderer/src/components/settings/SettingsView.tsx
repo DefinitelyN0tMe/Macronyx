@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { HotkeyInput } from '../common/HotkeyInput'
 import type { AppSettings } from '@shared/types'
@@ -343,13 +343,80 @@ function HotkeySettings({
 }
 
 function AdvancedSettings(): JSX.Element {
+  const [portableActive, setPortableActive] = useState(false)
+  const [portableLoading, setPortableLoading] = useState(true)
+
+  const checkPortable = async (): Promise<void> => {
+    try {
+      const result = (await window.api.getPortableStatus()) as { active: boolean }
+      setPortableActive(result.active)
+    } catch {
+      // ignore
+    }
+    setPortableLoading(false)
+  }
+
+  useEffect(() => {
+    checkPortable()
+  }, [])
+
+  const handleTogglePortable = async (): Promise<void> => {
+    setPortableLoading(true)
+    try {
+      const result = (await window.api.togglePortable(!portableActive)) as {
+        success: boolean
+        active: boolean
+      }
+      if (result.success) {
+        setPortableActive(result.active)
+      }
+    } catch {
+      // ignore
+    }
+    setPortableLoading(false)
+  }
+
   return (
     <>
       <SettingRow label="Version" description="Macronyx v1.0.0">
         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.0.0</span>
       </SettingRow>
-      <SettingRow label="Portable Mode" description="Create an empty file named 'portable' (no extension) next to Macronyx.exe to store data locally">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Not active</span>
+      <SettingRow
+        label="Portable Mode"
+        description={
+          portableActive
+            ? 'Data is stored next to the executable. Restart to apply changes.'
+            : 'Store settings and macros next to the executable instead of AppData'
+        }
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: portableActive ? 'var(--success)' : 'var(--text-muted)'
+            }}
+          >
+            {portableLoading ? '...' : portableActive ? 'Active' : 'Not active'}
+          </span>
+          <button
+            onClick={handleTogglePortable}
+            disabled={portableLoading}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 6,
+              border: `1px solid ${portableActive ? 'var(--danger)' : 'var(--accent-cyan)'}`,
+              background: 'transparent',
+              color: portableActive ? 'var(--danger)' : 'var(--accent-cyan)',
+              cursor: portableLoading ? 'wait' : 'pointer',
+              fontSize: 11,
+              fontWeight: 500,
+              opacity: portableLoading ? 0.5 : 1
+            }}
+          >
+            {portableActive ? 'Disable' : 'Enable'}
+          </button>
+        </div>
       </SettingRow>
       <div style={{ marginTop: 20 }}>
         <button

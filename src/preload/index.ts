@@ -56,6 +56,9 @@ const api = {
   deleteProfile: (id: string) => ipcRenderer.invoke(IPC.PROFILE_DELETE, id),
   activateProfile: (id: string) => ipcRenderer.invoke(IPC.PROFILE_ACTIVATE, id),
 
+  getPortableStatus: () => ipcRenderer.invoke(IPC.PORTABLE_STATUS),
+  togglePortable: (enable: boolean) => ipcRenderer.invoke(IPC.PORTABLE_TOGGLE, enable),
+
   minimizeWindow: () => ipcRenderer.send(IPC.WINDOW_MINIMIZE),
   maximizeWindow: () => ipcRenderer.send(IPC.WINDOW_MAXIMIZE),
   closeWindow: () => ipcRenderer.send(IPC.WINDOW_CLOSE),

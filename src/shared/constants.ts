@@ -35,7 +35,10 @@ export const IPC = {
   WINDOW_TO_TRAY: 'window:toTray',
   WINDOW_IS_MAXIMIZED: 'window:isMaximized',
 
-  APP_STATUS: 'app:status'
+  APP_STATUS: 'app:status',
+
+  PORTABLE_STATUS: 'portable:status',
+  PORTABLE_TOGGLE: 'portable:toggle'
 } as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
