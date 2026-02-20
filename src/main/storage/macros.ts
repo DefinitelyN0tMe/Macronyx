@@ -56,6 +56,7 @@ export class MacroStorage {
           // Return without the full events array for list performance
           macros.push({
             ...macro,
+            eventCount: macro.events.length,
             events: [] // Omit events from list for performance
           })
         } catch {

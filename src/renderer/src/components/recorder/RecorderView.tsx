@@ -27,7 +27,9 @@ export function RecorderView(): JSX.Element {
 
       {/* Record Button */}
       <button
+        tabIndex={-1}
         onClick={isRecording ? stopRecording : startRecording}
+        onKeyDown={(e) => { if (e.key === ' ') e.preventDefault() }}
         style={{
           width: 120,
           height: 120,

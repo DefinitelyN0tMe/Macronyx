@@ -68,6 +68,14 @@ const api = {
     return () => {
       ipcRenderer.removeListener(IPC.APP_STATUS, listener)
     }
+  },
+
+  onHotkeyAction: (callback: (action: string) => void) => {
+    const listener = (_: unknown, action: string): void => callback(action)
+    ipcRenderer.on('hotkey:action', listener)
+    return () => {
+      ipcRenderer.removeListener('hotkey:action', listener)
+    }
   }
 }
 

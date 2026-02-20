@@ -8,7 +8,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { Macro } from '@shared/types'
 
 export function LibraryView(): JSX.Element {
-  const { macros, searchQuery, setSearchQuery, deleteMacro, loadMacros } = useMacroStore()
+  const { macros, searchQuery, setSearchQuery, deleteMacro, loadMacros, selectedMacroId, selectMacro } = useMacroStore()
   const setActiveView = useAppStore((s) => s.setActiveView)
   const hotkeys = useSettingsStore((s) => s.settings.hotkeys)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -17,6 +17,7 @@ export function LibraryView(): JSX.Element {
   const filteredMacros = useMacroStore.getState().getFilteredMacros()
 
   const handlePlay = async (macroId: string): Promise<void> => {
+    selectMacro(macroId)
     await window.api.startPlayback(macroId)
   }
 
@@ -140,7 +141,7 @@ export function LibraryView(): JSX.Element {
         <div
           style={{
             display: viewMode === 'grid' ? 'grid' : 'flex',
-            gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(280, 1fr))' : undefined,
+            gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(280px, 1fr))' : undefined,
             flexDirection: viewMode === 'list' ? 'column' : undefined,
             gap: 10
           }}
@@ -149,6 +150,8 @@ export function LibraryView(): JSX.Element {
             <MacroCard
               key={macro.id}
               macro={macro}
+              isSelected={selectedMacroId === macro.id}
+              onSelect={() => selectMacro(macro.id)}
               onPlay={() => handlePlay(macro.id)}
               onEdit={() => handleEdit(macro)}
               onExport={() => handleExport(macro.id)}
@@ -171,36 +174,59 @@ export function LibraryView(): JSX.Element {
 
 function MacroCard({
   macro,
+  isSelected,
+  onSelect,
   onPlay,
   onEdit,
   onExport,
   onDelete
 }: {
   macro: Macro
+  isSelected: boolean
+  onSelect: () => void
   onPlay: () => void
   onEdit: () => void
   onExport: () => void
   onDelete: () => void
 }): JSX.Element {
+  const evtCount = macro.eventCount ?? macro.events.length
   return (
     <div
+      onClick={onSelect}
       style={{
         padding: 14,
-        background: 'var(--bg-secondary)',
+        background: isSelected ? 'rgba(6, 182, 212, 0.05)' : 'var(--bg-secondary)',
         borderRadius: 10,
-        border: '1px solid var(--border-color)',
-        transition: 'border-color 0.15s'
+        border: `1px solid ${isSelected ? 'var(--accent-cyan)' : 'var(--border-color)'}`,
+        transition: 'border-color 0.15s, background 0.15s',
+        cursor: 'pointer'
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--accent-cyan)'
+        if (!isSelected) e.currentTarget.style.borderColor = 'var(--accent-cyan)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--border-color)'
+        if (!isSelected) e.currentTarget.style.borderColor = 'var(--border-color)'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{macro.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{macro.name}</div>
+            {isSelected && (
+              <span style={{
+                padding: '1px 6px',
+                borderRadius: 4,
+                background: 'var(--accent-cyan)',
+                color: 'white',
+                fontSize: 9,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5
+              }}>
+                Selected
+              </span>
+            )}
+          </div>
           {macro.description && (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
               {macro.description}
@@ -208,6 +234,8 @@ function MacroCard({
           )}
           <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-secondary)' }}>
             <span>{formatDuration(macro.duration)}</span>
+            <span>&middot;</span>
+            <span>{evtCount} events</span>
             <span>&middot;</span>
             <span>{new Date(macro.updatedAt).toLocaleDateString()}</span>
           </div>
@@ -242,10 +270,10 @@ function MacroCard({
           paddingTop: 10
         }}
       >
-        <ActionBtn label="Play" color="var(--success)" onClick={onPlay} />
-        <ActionBtn label="Edit" color="var(--accent-cyan)" onClick={onEdit} />
-        <ActionBtn label="Export" color="var(--text-secondary)" onClick={onExport} />
-        <ActionBtn label="Delete" color="var(--danger)" onClick={onDelete} />
+        <ActionBtn label="Play" color="var(--success)" onClick={(e) => { e.stopPropagation(); onPlay() }} />
+        <ActionBtn label="Edit" color="var(--accent-cyan)" onClick={(e) => { e.stopPropagation(); onEdit() }} />
+        <ActionBtn label="Export" color="var(--text-secondary)" onClick={(e) => { e.stopPropagation(); onExport() }} />
+        <ActionBtn label="Delete" color="var(--danger)" onClick={(e) => { e.stopPropagation(); onDelete() }} />
       </div>
     </div>
   )
@@ -292,7 +320,7 @@ function ActionBtn({
 }: {
   label: string
   color: string
-  onClick: () => void
+  onClick: (e: React.MouseEvent) => void
 }): JSX.Element {
   return (
     <button

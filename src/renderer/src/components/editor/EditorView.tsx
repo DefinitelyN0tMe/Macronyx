@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { useAppStore } from '../../stores/appStore'
+import { useMacroStore } from '../../stores/macroStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { Timeline } from './Timeline'
 import { EventInspector } from './EventInspector'
 import { MousePathPreview } from './MousePathPreview'
@@ -18,11 +20,32 @@ export function EditorView(): JSX.Element {
   const historyIndex = useEditorStore((s) => s.historyIndex)
   const history = useEditorStore((s) => s.history)
   const setActiveView = useAppStore((s) => s.setActiveView)
+  const status = useAppStore((s) => s.status)
+  const loadMacros = useMacroStore((s) => s.loadMacros)
+  const hotkeys = useSettingsStore((s) => s.settings.hotkeys)
 
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
   const [isEditingDesc, setIsEditingDesc] = useState(false)
   const [editDesc, setEditDesc] = useState('')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  const handleSave = useCallback(async () => {
+    setSaveStatus('saving')
+    await saveMacro()
+    await loadMacros()
+    setSaveStatus('saved')
+    setTimeout(() => setSaveStatus('idle'), 2000)
+  }, [saveMacro, loadMacros])
+
+  const handlePlay = useCallback(async () => {
+    if (!macro) return
+    await window.api.startPlayback(macro.id)
+  }, [macro])
+
+  const handleStop = useCallback(async () => {
+    await window.api.stopPlayback()
+  }, [])
 
   if (!macro) {
     return (
@@ -91,6 +114,8 @@ export function EditorView(): JSX.Element {
     }
     setIsEditingDesc(false)
   }
+
+  const isPlaying = status === 'playing' || status === 'paused'
 
   return (
     <div className="animate-slide-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -182,7 +207,7 @@ export function EditorView(): JSX.Element {
               title="Click to edit description"
               style={{
                 fontSize: 11,
-                color: macro.description ? 'var(--text-muted)' : 'var(--text-muted)',
+                color: 'var(--text-muted)',
                 cursor: 'pointer',
                 opacity: macro.description ? 1 : 0.5,
                 padding: '2px 4px',
@@ -204,7 +229,19 @@ export function EditorView(): JSX.Element {
             {macro.events.length} events &middot; {(macro.duration / 1000).toFixed(1)}s
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+          {/* Playback controls */}
+          {isPlaying ? (
+            <ToolbarBtn label="Stop" onClick={handleStop} color="var(--danger)" />
+          ) : (
+            <ToolbarBtn
+              label="Play"
+              onClick={handlePlay}
+              disabled={macro.events.length === 0}
+              color="var(--success)"
+            />
+          )}
+          <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px', height: 20 }} />
           <ToolbarBtn
             label="Undo"
             disabled={historyIndex <= 0}
@@ -215,7 +252,7 @@ export function EditorView(): JSX.Element {
             disabled={historyIndex >= history.length - 1}
             onClick={redo}
           />
-          <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px' }} />
+          <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px', height: 20 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Zoom</span>
             <input
@@ -230,23 +267,34 @@ export function EditorView(): JSX.Element {
               {zoom}px/s
             </span>
           </div>
-          <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px' }} />
+          <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px', height: 20 }} />
           <button
-            onClick={saveMacro}
+            onClick={handleSave}
+            disabled={saveStatus === 'saving'}
+            tabIndex={-1}
             style={{
               padding: '6px 14px',
               borderRadius: 6,
               border: 'none',
-              background: 'var(--accent-cyan)',
+              background: saveStatus === 'saved' ? 'var(--success)' : 'var(--accent-cyan)',
               color: 'white',
-              cursor: 'pointer',
+              cursor: saveStatus === 'saving' ? 'wait' : 'pointer',
               fontSize: 12,
-              fontWeight: 600
+              fontWeight: 600,
+              transition: 'background 0.2s',
+              minWidth: 60
             }}
           >
-            Save
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save'}
           </button>
         </div>
+      </div>
+
+      {/* Hotkey hints */}
+      <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+        <span>Play: <kbd style={{ color: 'var(--accent-cyan)', fontFamily: 'monospace' }}>{hotkeys.playStart}</kbd></span>
+        <span>Stop: <kbd style={{ color: 'var(--accent-cyan)', fontFamily: 'monospace' }}>{hotkeys.playStop}</kbd></span>
+        <span>Emergency: <kbd style={{ color: 'var(--danger)', fontFamily: 'monospace' }}>{hotkeys.emergencyStop}</kbd></span>
       </div>
 
       {/* Main content: Timeline + Inspector */}
@@ -264,26 +312,31 @@ export function EditorView(): JSX.Element {
 function ToolbarBtn({
   label,
   disabled,
-  onClick
+  onClick,
+  color
 }: {
   label: string
-  disabled: boolean
+  disabled?: boolean
   onClick: () => void
+  color?: string
 }): JSX.Element {
+  const isDisabled = disabled ?? false
+  const c = color || 'var(--text-primary)'
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
+      tabIndex={-1}
       style={{
         padding: '6px 12px',
         borderRadius: 6,
-        border: '1px solid var(--border-color)',
-        background: disabled ? 'transparent' : 'var(--bg-secondary)',
-        color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
+        border: `1px solid ${isDisabled ? 'var(--border-color)' : c + '44'}`,
+        background: isDisabled ? 'transparent' : c + '11',
+        color: isDisabled ? 'var(--text-muted)' : c,
+        cursor: isDisabled ? 'not-allowed' : 'pointer',
         fontSize: 12,
         fontWeight: 500,
-        opacity: disabled ? 0.5 : 1
+        opacity: isDisabled ? 0.5 : 1
       }}
     >
       {label}

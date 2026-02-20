@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { AppStatus, RecordingState, Macro } from '@shared/types'
+import type { RecordingState, Macro } from '@shared/types'
 import { useAppStore } from '../stores/appStore'
 import { useMacroStore } from '../stores/macroStore'
 
 export function useRecording() {
-  const { status, setStatus } = useAppStore()
+  const status = useAppStore((s) => s.status)
   const { loadMacros } = useMacroStore()
   const [eventCount, setEventCount] = useState(0)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -25,21 +25,16 @@ export function useRecording() {
     const unsub = window.api.onRecordingStatus((raw) => {
       const state = raw as RecordingState
       if (state.isRecording) {
-        setStatus('recording')
+        useAppStore.getState().setStatus('recording')
       }
     })
     return unsub
-  }, [setStatus])
-
-  useEffect(() => {
-    const unsub = window.api.onAppStatus((raw) => {
-      setStatus(raw as AppStatus)
-    })
-    return unsub
-  }, [setStatus])
+  }, [])
 
   useEffect(() => {
     if (isRecording) {
+      setEventCount(0)
+      setElapsedMs(0)
       startTimeRef.current = Date.now()
       timerRef.current = setInterval(() => {
         setElapsedMs(Date.now() - startTimeRef.current)

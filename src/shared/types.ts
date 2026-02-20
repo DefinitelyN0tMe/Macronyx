@@ -37,6 +37,7 @@ export interface Macro {
   name: string
   description: string
   events: MacroEvent[]
+  eventCount?: number // used by list() when events are omitted for performance
   duration: number // ms
   createdAt: string
   updatedAt: string
