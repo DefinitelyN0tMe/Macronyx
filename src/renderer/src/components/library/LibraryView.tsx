@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMacroStore } from '../../stores/macroStore'
 import { useAppStore } from '../../stores/appStore'
 import { useEditorStore } from '../../stores/editorStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { formatDuration } from '../../utils/formatTime'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { Macro } from '@shared/types'
@@ -9,6 +10,7 @@ import type { Macro } from '@shared/types'
 export function LibraryView(): JSX.Element {
   const { macros, searchQuery, setSearchQuery, deleteMacro, loadMacros } = useMacroStore()
   const setActiveView = useAppStore((s) => s.setActiveView)
+  const hotkeys = useSettingsStore((s) => s.settings.hotkeys)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
@@ -97,6 +99,26 @@ export function LibraryView(): JSX.Element {
           marginBottom: 16
         }}
       />
+
+      {/* Hotkey Info */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          padding: '8px 14px',
+          background: 'var(--bg-secondary)',
+          borderRadius: 8,
+          border: '1px solid var(--border-subtle)',
+          marginBottom: 16,
+          fontSize: 11
+        }}
+      >
+        <HotkeyBadge label="Play" hotkey={hotkeys.playStart} />
+        <HotkeyBadge label="Stop" hotkey={hotkeys.playStop} />
+        <HotkeyBadge label="Record" hotkey={hotkeys.recordStart} />
+        <HotkeyBadge label="Emergency" hotkey={hotkeys.emergencyStop} color="var(--danger)" />
+      </div>
 
       {/* Macro Grid/List */}
       {filteredMacros.length === 0 ? (
@@ -225,6 +247,40 @@ function MacroCard({
         <ActionBtn label="Export" color="var(--text-secondary)" onClick={onExport} />
         <ActionBtn label="Delete" color="var(--danger)" onClick={onDelete} />
       </div>
+    </div>
+  )
+}
+
+function HotkeyBadge({
+  label,
+  hotkey,
+  color
+}: {
+  label: string
+  hotkey: string
+  color?: string
+}): JSX.Element {
+  const c = color || 'var(--accent-cyan)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, fontSize: 10 }}>
+        {label}
+      </span>
+      <kbd
+        style={{
+          padding: '2px 8px',
+          borderRadius: 4,
+          background: `${c}15`,
+          border: `1px solid ${c}40`,
+          color: c,
+          fontFamily: 'monospace',
+          fontWeight: 600,
+          letterSpacing: 0.5,
+          fontSize: 11
+        }}
+      >
+        {hotkey}
+      </kbd>
     </div>
   )
 }

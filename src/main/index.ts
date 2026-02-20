@@ -1,7 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import { registerIpcHandlers } from './ipc'
+import { registerIpcHandlers, cleanupIpc } from './ipc'
 import { TrayManager } from './tray'
 
 let mainWindow: BrowserWindow | null = null
@@ -64,5 +64,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  cleanupIpc()
   trayManager?.destroy()
 })

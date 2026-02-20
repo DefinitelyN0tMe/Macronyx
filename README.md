@@ -51,7 +51,7 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
   - `F9` Start recording
   - `F10` Stop recording
   - `F11` Start playback
-  - `F12` Stop playback
+  - `Shift+F11` Stop playback
   - `Escape` Emergency stop
 - System tray with silent mode — minimizes and stays out of the way
 - All hotkeys are fully customizable

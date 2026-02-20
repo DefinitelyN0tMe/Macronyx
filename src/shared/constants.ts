@@ -63,7 +63,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     recordStart: 'F9',
     recordStop: 'F10',
     playStart: 'F11',
-    playStop: 'F12',
+    playStop: 'Shift+F11',
     emergencyStop: 'Escape'
   },
   appearance: {

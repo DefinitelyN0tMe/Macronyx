@@ -7,6 +7,7 @@ export function RecorderView(): JSX.Element {
   const { isRecording, eventCount, elapsedMs, startRecording, stopRecording } = useRecording()
   const settings = useSettingsStore((s) => s.settings)
   const updateSettings = useSettingsStore((s) => s.updateSettings)
+  const hotkeys = settings.hotkeys
 
   return (
     <div
@@ -52,7 +53,9 @@ export function RecorderView(): JSX.Element {
       </button>
 
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-        {isRecording ? 'Click to stop recording' : 'Click to start recording'}
+        {isRecording
+          ? `Click or press ${hotkeys.recordStop} to stop recording`
+          : `Click or press ${hotkeys.recordStart} to start recording`}
       </div>
 
       {/* Timer & Stats */}
@@ -86,10 +89,12 @@ export function RecorderView(): JSX.Element {
         </div>
       </div>
 
+      {/* Hotkey Info */}
+      <HotkeyInfoBar hotkeys={hotkeys} isRecording={isRecording} />
+
       {/* Recording Options */}
       <div
         style={{
-          marginTop: 16,
           padding: 16,
           background: 'var(--bg-secondary)',
           borderRadius: 10,
@@ -132,6 +137,92 @@ export function RecorderView(): JSX.Element {
           />
         </div>
       </div>
+    </div>
+  )
+}
+
+function HotkeyInfoBar({
+  hotkeys,
+  isRecording
+}: {
+  hotkeys: { recordStart: string; recordStop: string; playStart: string; playStop: string; emergencyStop: string }
+  isRecording: boolean
+}): JSX.Element {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        padding: '10px 16px',
+        background: 'var(--bg-secondary)',
+        borderRadius: 8,
+        border: '1px solid var(--border-subtle)',
+        maxWidth: 420,
+        width: '100%'
+      }}
+    >
+      <HotkeyBadge
+        label="Start"
+        hotkey={hotkeys.recordStart}
+        active={!isRecording}
+      />
+      <HotkeyBadge
+        label="Stop"
+        hotkey={hotkeys.recordStop}
+        active={isRecording}
+      />
+      <HotkeyBadge
+        label="Emergency"
+        hotkey={hotkeys.emergencyStop}
+        color="var(--danger)"
+        active={isRecording}
+      />
+    </div>
+  )
+}
+
+function HotkeyBadge({
+  label,
+  hotkey,
+  color,
+  active
+}: {
+  label: string
+  hotkey: string
+  color?: string
+  active?: boolean
+}): JSX.Element {
+  const c = color || 'var(--accent-cyan)'
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        opacity: active ? 1 : 0.4,
+        transition: 'opacity 0.2s'
+      }}
+    >
+      <span style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+        {label}
+      </span>
+      <kbd
+        style={{
+          padding: '2px 8px',
+          borderRadius: 4,
+          background: `${c}15`,
+          border: `1px solid ${c}40`,
+          color: c,
+          fontSize: 11,
+          fontFamily: 'monospace',
+          fontWeight: 600,
+          letterSpacing: 0.5
+        }}
+      >
+        {hotkey}
+      </kbd>
     </div>
   )
 }

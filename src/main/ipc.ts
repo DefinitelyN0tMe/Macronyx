@@ -292,3 +292,14 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
 
   hotkeyManager.registerAll(settings.hotkeys)
 }
+
+export function cleanupIpc(): void {
+  if (player) {
+    player.destroy()
+    player = null
+  }
+  if (hotkeyManager) {
+    hotkeyManager.unregisterAll()
+    hotkeyManager = null
+  }
+}

@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -29,8 +30,18 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Install Python setuptools (macOS)
+        if: matrix.platform == 'mac'
+        run: python3 -m pip install setuptools --break-system-packages || python3 -m pip install setuptools
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxtst-dev libpng-dev
+
       - name: Install dependencies
         run: npm ci
+        env:
+          npm_config_build_from_source: false
 
       - name: Build
         run: npm run build
@@ -63,6 +74,7 @@ jobs:
             dist/*.zip
             dist/*.AppImage
             dist/*.deb
+            dist/*.blockmap
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

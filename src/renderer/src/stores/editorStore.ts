@@ -18,6 +18,8 @@ interface EditorState {
   historyIndex: number
 
   loadMacro: (macro: Macro) => void
+  renameMacro: (name: string) => void
+  updateMacroDescription: (description: string) => void
   selectEvents: (ids: string[]) => void
   toggleSelectEvent: (id: string) => void
   updateEvent: (id: string, changes: Partial<MacroEvent>) => void
@@ -58,6 +60,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       scrollOffset: 0,
       playheadMs: 0
     })
+  },
+
+  renameMacro: (name) => {
+    const { macro } = get()
+    if (!macro) return
+    set({ macro: { ...macro, name } })
+  },
+
+  updateMacroDescription: (description) => {
+    const { macro } = get()
+    if (!macro) return
+    set({ macro: { ...macro, description } })
   },
 
   selectEvents: (ids) => set({ selectedEventIds: ids }),

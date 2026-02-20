@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { useAppStore } from '../../stores/appStore'
 import { Timeline } from './Timeline'
@@ -10,11 +11,18 @@ export function EditorView(): JSX.Element {
   const undo = useEditorStore((s) => s.undo)
   const redo = useEditorStore((s) => s.redo)
   const saveMacro = useEditorStore((s) => s.saveMacro)
+  const renameMacro = useEditorStore((s) => s.renameMacro)
+  const updateMacroDescription = useEditorStore((s) => s.updateMacroDescription)
   const zoom = useEditorStore((s) => s.zoom)
   const setZoom = useEditorStore((s) => s.setZoom)
   const historyIndex = useEditorStore((s) => s.historyIndex)
   const history = useEditorStore((s) => s.history)
   const setActiveView = useAppStore((s) => s.setActiveView)
+
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [isEditingDesc, setIsEditingDesc] = useState(false)
+  const [editDesc, setEditDesc] = useState('')
 
   if (!macro) {
     return (
@@ -59,6 +67,31 @@ export function EditorView(): JSX.Element {
     )
   }
 
+  const startEditingName = (): void => {
+    setEditName(macro.name)
+    setIsEditingName(true)
+  }
+
+  const commitName = (): void => {
+    const trimmed = editName.trim()
+    if (trimmed && trimmed !== macro.name) {
+      renameMacro(trimmed)
+    }
+    setIsEditingName(false)
+  }
+
+  const startEditingDesc = (): void => {
+    setEditDesc(macro.description)
+    setIsEditingDesc(true)
+  }
+
+  const commitDesc = (): void => {
+    if (editDesc !== macro.description) {
+      updateMacroDescription(editDesc)
+    }
+    setIsEditingDesc(false)
+  }
+
   return (
     <div className="animate-slide-in" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Toolbar */}
@@ -70,13 +103,108 @@ export function EditorView(): JSX.Element {
           flexShrink: 0
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>{macro.name}</h2>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+          {isEditingName ? (
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitName()
+                if (e.key === 'Escape') setIsEditingName(false)
+              }}
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--accent-cyan)',
+                borderRadius: 6,
+                color: 'var(--text-primary)',
+                padding: '2px 8px',
+                outline: 'none',
+                minWidth: 120,
+                maxWidth: 300
+              }}
+            />
+          ) : (
+            <h2
+              onClick={startEditingName}
+              title="Click to rename"
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '2px 8px',
+                borderRadius: 6,
+                border: '1px solid transparent',
+                transition: 'border-color 0.15s',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'transparent'
+              }}
+            >
+              {macro.name}
+            </h2>
+          )}
+          {isEditingDesc ? (
+            <input
+              autoFocus
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+              onBlur={commitDesc}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitDesc()
+                if (e.key === 'Escape') setIsEditingDesc(false)
+              }}
+              placeholder="Add description..."
+              style={{
+                fontSize: 11,
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--accent-violet)',
+                borderRadius: 4,
+                color: 'var(--text-secondary)',
+                padding: '2px 6px',
+                outline: 'none',
+                minWidth: 100,
+                maxWidth: 200
+              }}
+            />
+          ) : (
+            <span
+              onClick={startEditingDesc}
+              title="Click to edit description"
+              style={{
+                fontSize: 11,
+                color: macro.description ? 'var(--text-muted)' : 'var(--text-muted)',
+                cursor: 'pointer',
+                opacity: macro.description ? 1 : 0.5,
+                padding: '2px 4px',
+                borderRadius: 4,
+                border: '1px solid transparent',
+                transition: 'border-color 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'transparent'
+              }}
+            >
+              {macro.description || '+ description'}
+            </span>
+          )}
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
             {macro.events.length} events &middot; {(macro.duration / 1000).toFixed(1)}s
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           <ToolbarBtn
             label="Undo"
             disabled={historyIndex <= 0}
