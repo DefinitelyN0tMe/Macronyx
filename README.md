@@ -79,6 +79,20 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 
 ---
 
+## 🎬 Macronyx in Action
+
+<p align="center">
+  <img src="assets/overview.gif" alt="Macronyx overview" width="900">
+</p>
+
+<p align="center">
+  <img src="assets/recording.gif" alt="Recording macro" width="900">
+</p>
+
+<p align="center">
+  <img src="assets/editor.gif" alt="Timeline editor and library" width="900">
+</p>
+
 ## Usage
 
 ### Quick Start
