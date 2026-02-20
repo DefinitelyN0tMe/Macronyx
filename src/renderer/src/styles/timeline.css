@@ -120,6 +120,33 @@
   clip-path: polygon(50% 100%, 0 0, 100% 0);
 }
 
+.timeline-event.dragging {
+  opacity: 0.5;
+  z-index: 20;
+  cursor: grabbing;
+}
+
+.timeline-group-band {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.timeline-group-label {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 .timeline-empty {
   display: flex;
   align-items: center;

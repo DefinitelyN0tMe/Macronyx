@@ -37,3 +37,14 @@ export function isMouseEvent(type: MacroEventType): boolean {
 export function isKeyEvent(type: MacroEventType): boolean {
   return type.startsWith('key_')
 }
+
+/** Deterministic HSL color from a string (for group bands) */
+export function stringToColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    hash |= 0 // Convert to 32bit integer
+  }
+  const hue = ((hash % 360) + 360) % 360
+  return `hsl(${hue}, 60%, 55%)`
+}

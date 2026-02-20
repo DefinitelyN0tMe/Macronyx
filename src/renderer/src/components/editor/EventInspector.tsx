@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { getEventTypeLabel, getEventTypeColor } from '../../utils/eventHelpers'
 import { getKeyLabel } from '../../utils/keyLabels'
@@ -8,12 +8,51 @@ export function EventInspector(): JSX.Element {
   const selectedEventIds = useEditorStore((s) => s.selectedEventIds)
   const updateEvent = useEditorStore((s) => s.updateEvent)
   const deleteEvents = useEditorStore((s) => s.deleteEvents)
+  const offsetEvents = useEditorStore((s) => s.offsetEvents)
+  const scaleDelays = useEditorStore((s) => s.scaleDelays)
+  const groupEvents = useEditorStore((s) => s.groupEvents)
+  const ungroupEvents = useEditorStore((s) => s.ungroupEvents)
 
   const selectedEvent =
     selectedEventIds.length === 1
       ? macro?.events.find((e) => e.id === selectedEventIds[0])
       : null
 
+  // Collect existing group names for datalist
+  const existingGroups = useMemo(() => {
+    if (!macro) return []
+    const groups = new Set<string>()
+    for (const ev of macro.events) {
+      if (ev.group) groups.add(ev.group)
+    }
+    return Array.from(groups).sort()
+  }, [macro])
+
+  // Check if any selected events have groups
+  const selectedHaveGroups = useMemo(() => {
+    if (!macro || selectedEventIds.length === 0) return false
+    const idSet = new Set(selectedEventIds)
+    return macro.events.some((e) => idSet.has(e.id) && e.group)
+  }, [macro, selectedEventIds])
+
+  // Multi-select batch panel
+  if (selectedEventIds.length > 1) {
+    return (
+      <BatchPanel
+        count={selectedEventIds.length}
+        ids={selectedEventIds}
+        existingGroups={existingGroups}
+        hasGroups={selectedHaveGroups}
+        onOffset={(delta) => offsetEvents(selectedEventIds, delta)}
+        onScale={(factor) => scaleDelays(selectedEventIds, factor)}
+        onGroup={(name) => groupEvents(selectedEventIds, name)}
+        onUngroup={() => ungroupEvents(selectedEventIds)}
+        onDelete={() => deleteEvents(selectedEventIds)}
+      />
+    )
+  }
+
+  // No selection
   if (!selectedEvent) {
     return (
       <div
@@ -32,13 +71,12 @@ export function EventInspector(): JSX.Element {
           flexShrink: 0
         }}
       >
-        {selectedEventIds.length > 1
-          ? `${selectedEventIds.length} events selected`
-          : 'Select an event to inspect'}
+        Select an event to inspect
       </div>
     )
   }
 
+  // Single event inspector
   const color = getEventTypeColor(selectedEvent.type)
 
   return (
@@ -173,6 +211,14 @@ export function EventInspector(): JSX.Element {
             </div>
           </div>
         )}
+
+        {/* Group field for single event */}
+        <SingleGroupField
+          event={selectedEvent}
+          existingGroups={existingGroups}
+          onGroup={(name) => groupEvents([selectedEvent.id], name)}
+          onUngroup={() => ungroupEvents([selectedEvent.id])}
+        />
       </div>
 
       <button
@@ -192,6 +238,318 @@ export function EventInspector(): JSX.Element {
       >
         Delete Event
       </button>
+    </div>
+  )
+}
+
+/** Group assignment field for a single event */
+function SingleGroupField({
+  event,
+  existingGroups,
+  onGroup,
+  onUngroup
+}: {
+  event: { group?: string }
+  existingGroups: string[]
+  onGroup: (name: string) => void
+  onUngroup: () => void
+}): JSX.Element {
+  const [groupInput, setGroupInput] = useState(event.group || '')
+
+  useEffect(() => {
+    setGroupInput(event.group || '')
+  }, [event.group])
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Group</div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <input
+          type="text"
+          list="group-names"
+          value={groupInput}
+          onChange={(e) => setGroupInput(e.target.value)}
+          onBlur={() => {
+            if (groupInput.trim() && groupInput !== event.group) {
+              onGroup(groupInput.trim())
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && groupInput.trim()) {
+              onGroup(groupInput.trim())
+            }
+          }}
+          placeholder="Assign group..."
+          style={{
+            flex: 1,
+            padding: '6px 8px',
+            borderRadius: 6,
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-primary)',
+            color: 'var(--text-primary)',
+            fontSize: 12
+          }}
+        />
+        {event.group && (
+          <button
+            onClick={onUngroup}
+            title="Remove from group"
+            style={{
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-primary)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: 11
+            }}
+          >
+            x
+          </button>
+        )}
+      </div>
+      <datalist id="group-names">
+        {existingGroups.map((g) => (
+          <option key={g} value={g} />
+        ))}
+      </datalist>
+    </div>
+  )
+}
+
+/** Batch editing panel for multiple selected events */
+function BatchPanel({
+  count,
+  ids,
+  existingGroups,
+  hasGroups,
+  onOffset,
+  onScale,
+  onGroup,
+  onUngroup,
+  onDelete
+}: {
+  count: number
+  ids: string[]
+  existingGroups: string[]
+  hasGroups: boolean
+  onOffset: (delta: number) => void
+  onScale: (factor: number) => void
+  onGroup: (name: string) => void
+  onUngroup: () => void
+  onDelete: () => void
+}): JSX.Element {
+  const [offsetMs, setOffsetMs] = useState('0')
+  const [scalePercent, setScalePercent] = useState('100')
+  const [groupName, setGroupName] = useState('')
+
+  return (
+    <div
+      style={{
+        width: 260,
+        background: 'var(--bg-secondary)',
+        borderRadius: 8,
+        border: '1px solid var(--border-color)',
+        padding: 16,
+        flexShrink: 0,
+        overflow: 'auto'
+      }}
+    >
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          marginBottom: 4
+        }}
+      >
+        {count} events selected
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          marginBottom: 16
+        }}
+      >
+        Batch edit selected events
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Offset time */}
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+            Offset time by (ms)
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              type="number"
+              value={offsetMs}
+              onChange={(e) => setOffsetMs(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 12,
+                fontFamily: 'monospace'
+              }}
+            />
+            <button
+              onClick={() => {
+                const delta = parseInt(offsetMs, 10)
+                if (!isNaN(delta) && delta !== 0) onOffset(delta)
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: '1px solid var(--accent-cyan)',
+                background: 'var(--accent-cyan)22',
+                color: 'var(--accent-cyan)',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 600
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+
+        {/* Scale delays */}
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+            Scale delays (%)
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              type="number"
+              value={scalePercent}
+              min={1}
+              onChange={(e) => setScalePercent(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 12,
+                fontFamily: 'monospace'
+              }}
+            />
+            <button
+              onClick={() => {
+                const pct = parseInt(scalePercent, 10)
+                if (!isNaN(pct) && pct > 0 && pct !== 100) onScale(pct / 100)
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: '1px solid var(--accent-cyan)',
+                background: 'var(--accent-cyan)22',
+                color: 'var(--accent-cyan)',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 600
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+
+        {/* Group assignment */}
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+            Assign to group
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              type="text"
+              list="batch-group-names"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="Group name..."
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 12
+              }}
+            />
+            <button
+              onClick={() => {
+                if (groupName.trim()) {
+                  onGroup(groupName.trim())
+                  setGroupName('')
+                }
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 6,
+                border: '1px solid var(--accent-cyan)',
+                background: 'var(--accent-cyan)22',
+                color: 'var(--accent-cyan)',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 600
+              }}
+            >
+              Set
+            </button>
+          </div>
+          <datalist id="batch-group-names">
+            {existingGroups.map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
+        </div>
+
+        {/* Ungroup button */}
+        {hasGroups && (
+          <button
+            onClick={onUngroup}
+            style={{
+              width: '100%',
+              padding: '8px 0',
+              borderRadius: 6,
+              border: '1px solid var(--border-color)',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 500
+            }}
+          >
+            Ungroup Selected
+          </button>
+        )}
+
+        {/* Delete all */}
+        <button
+          onClick={onDelete}
+          style={{
+            width: '100%',
+            padding: '8px 0',
+            borderRadius: 6,
+            border: '1px solid var(--danger)',
+            background: 'transparent',
+            color: 'var(--danger)',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 500,
+            marginTop: 4
+          }}
+        >
+          Delete {count} Events
+        </button>
+      </div>
     </div>
   )
 }

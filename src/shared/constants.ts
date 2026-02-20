@@ -3,6 +3,8 @@ import type { AppSettings } from './types'
 export const IPC = {
   RECORDING_START: 'recording:start',
   RECORDING_STOP: 'recording:stop',
+  RECORDING_PAUSE: 'recording:pause',
+  RECORDING_RESUME: 'recording:resume',
   RECORDING_EVENT: 'recording:event',
   RECORDING_STATUS: 'recording:status',
 

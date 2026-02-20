@@ -26,14 +26,18 @@ function OverlayWidget(): JSX.Element {
   const [status, setStatus] = useState<OverlayStatus>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [hovered, setHovered] = useState(false)
-  const recordingStartRef = useRef<number | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const baseElapsedRef = useRef(0)
+  const timerStartRef = useRef(0)
 
   useEffect(() => {
     const unsub = window.api.onOverlayStatus((data: unknown) => {
       const update = data as StatusUpdate
       setStatus(update.status)
       setElapsedMs(update.elapsedMs)
+      // Store the elapsed offset so local timer can continue from it
+      baseElapsedRef.current = update.elapsedMs
+      timerStartRef.current = Date.now()
     })
     return unsub
   }, [])
@@ -41,18 +45,14 @@ function OverlayWidget(): JSX.Element {
   // Local timer for recording mode (recording doesn't send periodic progress)
   useEffect(() => {
     if (status === 'recording') {
-      recordingStartRef.current = Date.now()
       timerRef.current = setInterval(() => {
-        if (recordingStartRef.current) {
-          setElapsedMs(Date.now() - recordingStartRef.current)
-        }
+        setElapsedMs(baseElapsedRef.current + (Date.now() - timerStartRef.current))
       }, 200)
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
-      recordingStartRef.current = null
     }
     return () => {
       if (timerRef.current) {

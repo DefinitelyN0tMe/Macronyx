@@ -28,8 +28,26 @@ export function StatusBar(): JSX.Element {
         flexShrink: 0
       }}
     >
-      <span>{statusTexts[status]}</span>
-      <div style={{ display: 'flex', gap: 12 }}>
+      <span style={{ flex: 1 }}>{statusTexts[status]}</span>
+      <span style={{ flex: 1, textAlign: 'center' }}>
+        Made with care by{' '}
+        <a
+          href="https://github.com/DefinitelyN0tMe"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--text-secondary)',
+            fontWeight: 600,
+            textDecoration: 'none',
+            transition: 'color 0.15s'
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-cyan)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary)')}
+        >
+          DefinitelyN0tMe
+        </a>
+      </span>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
         <span>Record: {formatHotkey(settings.hotkeys.recordStart)}</span>
         <span>Play: {formatHotkey(settings.hotkeys.playStart)}</span>
         <span>Stop: {formatHotkey(settings.hotkeys.emergencyStop)}</span>

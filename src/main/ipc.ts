@@ -111,6 +111,42 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     }
   })
 
+  ipcMain.handle(IPC.RECORDING_PAUSE, async () => {
+    try {
+      recorder!.pause()
+      mainWindow.webContents.send(IPC.APP_STATUS, 'recording_paused')
+      updateOverlayStatus('paused')
+      mainWindow.webContents.send(IPC.RECORDING_STATUS, {
+        isRecording: true,
+        isPaused: true,
+        eventCount: currentRecordingEvents.length,
+        elapsedMs: Date.now() - recordingStartTime,
+        startTime: recordingStartTime
+      })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.RECORDING_RESUME, async () => {
+    try {
+      recorder!.resume()
+      mainWindow.webContents.send(IPC.APP_STATUS, 'recording')
+      updateOverlayStatus('recording')
+      mainWindow.webContents.send(IPC.RECORDING_STATUS, {
+        isRecording: true,
+        isPaused: false,
+        eventCount: currentRecordingEvents.length,
+        elapsedMs: Date.now() - recordingStartTime,
+        startTime: recordingStartTime
+      })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
   // Playback
   ipcMain.handle(IPC.PLAYBACK_START, async (_e, macroId: string) => {
     try {

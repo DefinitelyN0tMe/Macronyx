@@ -8,7 +8,7 @@ export type MacroEventType =
 
 export type MouseButton = 'left' | 'right' | 'middle'
 
-export type AppStatus = 'idle' | 'recording' | 'playing' | 'paused'
+export type AppStatus = 'idle' | 'recording' | 'recording_paused' | 'playing' | 'paused'
 
 export interface MacroEvent {
   id: string
@@ -22,6 +22,7 @@ export interface MacroEvent {
   key?: string
   keyCode?: number
   modifiers?: string[]
+  group?: string
 }
 
 export interface PlaybackSettings {
@@ -99,6 +100,7 @@ export interface PlaybackState {
 
 export interface RecordingState {
   isRecording: boolean
+  isPaused: boolean
   eventCount: number
   elapsedMs: number
   startTime: number

@@ -6,7 +6,7 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.1 — "Polish & Support" *(current)*
+## v1.1 — "Polish & Support"
 
 | Feature | Description | Size | Status |
 |---------|-------------|:----:|:------:|
@@ -18,17 +18,17 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.2 — "Editor Power-Up"
+## v1.2 — "Editor Power-Up" *(current)*
 
-| Feature | Description | Size |
-|---------|-------------|:----:|
-| Recording pause/resume | Pause mid-recording without stopping, continue from same point | M |
-| Drag-and-drop events | Drag events on timeline to reorder and retime | M |
-| Multi-event batch editing | Select multiple events, edit shared properties at once | M |
-| Copy/paste events | Ctrl+C/V events within the timeline | S |
-| Event grouping | Group related events into named "actions" | M |
-| Auto-save + dirty flag | Warn on unsaved changes, periodic auto-save | S |
-| Smart delay smoothing | Automatically smooth out irregular delays in recordings (moving average, min/max clamp, curve interpolation) | M |
+| Feature | Description | Size | Status |
+|---------|-------------|:----:|:------:|
+| Recording pause/resume | Pause mid-recording without stopping, continue from same point | M | Done |
+| Drag-and-drop events | Drag events on timeline to reorder and retime | M | Done |
+| Multi-event batch editing | Select multiple events, edit shared properties at once | M | Done |
+| Copy/paste events | Ctrl+C/V events within the timeline | S | Done |
+| Event grouping | Group related events into named "actions" with colored timeline bands | M | Done |
+| Auto-save + dirty flag | Warn on unsaved changes, periodic auto-save, navigation guard | S | Done |
+| Smart delay smoothing | Moving-average smoothing with configurable window size and min/max clamp | M | Done |
 
 ---
 

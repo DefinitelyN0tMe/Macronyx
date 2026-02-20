@@ -7,6 +7,9 @@ export class Recorder {
   private startTime = 0
   private lastEventTime = 0
   private isRecording = false
+  private isPaused = false
+  private pausedDuration = 0
+  private pauseStartTime = 0
   private lastMouseMoveTime = 0
   private onEvent?: (event: MacroEvent) => void
   private settings: AppSettings['recording'] | null = null
@@ -17,6 +20,9 @@ export class Recorder {
     this.lastEventTime = this.startTime
     this.lastMouseMoveTime = 0
     this.isRecording = true
+    this.isPaused = false
+    this.pausedDuration = 0
+    this.pauseStartTime = 0
     this.onEvent = onEvent
     this.settings = settings
 
@@ -41,6 +47,7 @@ export class Recorder {
 
   stop(): MacroEvent[] {
     this.isRecording = false
+    this.isPaused = false
     try {
       uIOhook.stop()
     } catch {
@@ -50,6 +57,20 @@ export class Recorder {
     return [...this.events]
   }
 
+  pause(): void {
+    if (!this.isRecording || this.isPaused) return
+    this.isPaused = true
+    this.pauseStartTime = Date.now()
+  }
+
+  resume(): void {
+    if (!this.isRecording || !this.isPaused) return
+    this.pausedDuration += Date.now() - this.pauseStartTime
+    this.isPaused = false
+    // Reset lastEventTime so delay after resume is measured from resume moment
+    this.lastEventTime = Date.now()
+  }
+
   private addEvent(event: MacroEvent): void {
     this.events.push(event)
     this.onEvent?.(event)
@@ -57,14 +78,14 @@ export class Recorder {
 
   private getTimings(): { timestamp: number; delay: number } {
     const now = Date.now()
-    const timestamp = now - this.startTime
+    const timestamp = now - this.startTime - this.pausedDuration
     const delay = now - this.lastEventTime
     this.lastEventTime = now
     return { timestamp, delay }
   }
 
   private handleKeyDown = (e: UiohookKeyboardEvent): void => {
-    if (!this.isRecording) return
+    if (!this.isRecording || this.isPaused) return
     const { timestamp, delay } = this.getTimings()
     this.addEvent({
       id: uuid(),
@@ -77,7 +98,7 @@ export class Recorder {
   }
 
   private handleKeyUp = (e: UiohookKeyboardEvent): void => {
-    if (!this.isRecording) return
+    if (!this.isRecording || this.isPaused) return
     const { timestamp, delay } = this.getTimings()
     this.addEvent({
       id: uuid(),
@@ -90,7 +111,7 @@ export class Recorder {
   }
 
   private handleMouseClick = (e: UiohookMouseEvent): void => {
-    if (!this.isRecording) return
+    if (!this.isRecording || this.isPaused) return
     const { timestamp, delay } = this.getTimings()
     const button = e.button === 1 ? 'left' : e.button === 2 ? 'right' : 'middle'
     this.addEvent({
@@ -106,7 +127,7 @@ export class Recorder {
   }
 
   private handleMouseMove = (e: UiohookMouseEvent): void => {
-    if (!this.isRecording) return
+    if (!this.isRecording || this.isPaused) return
     const now = Date.now()
     const sampleRate = this.settings?.mouseMoveSampleRate ?? 16
     if (now - this.lastMouseMoveTime < sampleRate) return
@@ -123,7 +144,7 @@ export class Recorder {
   }
 
   private handleWheel = (e: UiohookWheelEvent): void => {
-    if (!this.isRecording) return
+    if (!this.isRecording || this.isPaused) return
     const { timestamp, delay } = this.getTimings()
     // uiohook: rotation > 0 = scroll down, direction 3 = vertical
     // Store raw rotation with direction sign for playback

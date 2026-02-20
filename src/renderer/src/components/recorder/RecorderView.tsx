@@ -4,7 +4,16 @@ import { formatTime } from '../../utils/formatTime'
 import { formatNumber } from '../../utils/formatTime'
 
 export function RecorderView(): JSX.Element {
-  const { isRecording, eventCount, elapsedMs, startRecording, stopRecording } = useRecording()
+  const {
+    isRecording,
+    isPaused,
+    eventCount,
+    elapsedMs,
+    startRecording,
+    stopRecording,
+    pauseRecording,
+    resumeRecording
+  } = useRecording()
   const settings = useSettingsStore((s) => s.settings)
   const updateSettings = useSettingsStore((s) => s.updateSettings)
   const hotkeys = settings.hotkeys
@@ -22,10 +31,10 @@ export function RecorderView(): JSX.Element {
       }}
     >
       <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)' }}>
-        {isRecording ? 'Recording in Progress' : 'Ready to Record'}
+        {isRecording ? (isPaused ? 'Recording Paused' : 'Recording in Progress') : 'Ready to Record'}
       </h2>
 
-      {/* Record Button */}
+      {/* Record / Stop Button */}
       <button
         tabIndex={-1}
         onClick={isRecording ? stopRecording : startRecording}
@@ -34,17 +43,23 @@ export function RecorderView(): JSX.Element {
           width: 120,
           height: 120,
           borderRadius: '50%',
-          border: `3px solid ${isRecording ? '#f87171' : '#374151'}`,
+          border: `3px solid ${isRecording ? (isPaused ? '#f59e0b' : '#f87171') : '#374151'}`,
           background: isRecording
-            ? 'radial-gradient(circle, #ef4444 0%, #991b1b 100%)'
+            ? isPaused
+              ? 'radial-gradient(circle, #f59e0b 0%, #92400e 100%)'
+              : 'radial-gradient(circle, #ef4444 0%, #991b1b 100%)'
             : 'radial-gradient(circle, #dc2626 0%, #7f1d1d 100%)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'all 0.2s ease',
-          animation: isRecording ? 'pulse-glow 1.5s infinite' : 'none',
-          boxShadow: isRecording ? '0 0 30px rgba(239,68,68,0.4)' : '0 4px 12px rgba(0,0,0,0.3)'
+          animation: isRecording && !isPaused ? 'pulse-glow 1.5s infinite' : 'none',
+          boxShadow: isRecording
+            ? isPaused
+              ? '0 0 20px rgba(245,158,11,0.3)'
+              : '0 0 30px rgba(239,68,68,0.4)'
+            : '0 4px 12px rgba(0,0,0,0.3)'
         }}
       >
         {isRecording ? (
@@ -54,9 +69,54 @@ export function RecorderView(): JSX.Element {
         )}
       </button>
 
+      {/* Pause / Resume controls (shown only while recording) */}
+      {isRecording && (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            tabIndex={-1}
+            onClick={isPaused ? resumeRecording : pauseRecording}
+            onKeyDown={(e) => { if (e.key === ' ') e.preventDefault() }}
+            title={isPaused ? 'Resume recording' : 'Pause recording'}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              border: `2px solid ${isPaused ? '#22c55e' : '#f59e0b'}`,
+              background: isPaused
+                ? 'radial-gradient(circle, #22c55e 0%, #166534 100%)'
+                : 'radial-gradient(circle, #f59e0b 0%, #92400e 100%)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              boxShadow: `0 2px 8px ${isPaused ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}`
+            }}
+          >
+            {isPaused ? (
+              /* Play / Resume triangle */
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 2 }}>
+                <polygon points="6,3 20,12 6,21" />
+              </svg>
+            ) : (
+              /* Pause bars */
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                <rect x="5" y="3" width="5" height="18" rx="1" />
+                <rect x="14" y="3" width="5" height="18" rx="1" />
+              </svg>
+            )}
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
+            {isPaused ? 'Resume' : 'Pause'}
+          </span>
+        </div>
+      )}
+
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
         {isRecording
-          ? `Click or press ${hotkeys.recordStop} to stop recording`
+          ? isPaused
+            ? `Paused — press ${hotkeys.recordStop} to stop`
+            : `Click or press ${hotkeys.recordStop} to stop recording`
           : `Click or press ${hotkeys.recordStart} to start recording`}
       </div>
 
@@ -68,7 +128,7 @@ export function RecorderView(): JSX.Element {
               fontSize: 36,
               fontWeight: 700,
               fontFamily: 'monospace',
-              color: isRecording ? 'var(--danger)' : 'var(--text-primary)',
+              color: isRecording ? (isPaused ? '#f59e0b' : 'var(--danger)') : 'var(--text-primary)',
               letterSpacing: 2
             }}
           >

@@ -1,23 +1,28 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { TitleBar } from './TitleBar'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
 import { DonateModal } from '../common/DonateModal'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { DashboardView } from '../dashboard/DashboardView'
 import { RecorderView } from '../recorder/RecorderView'
 import { EditorView } from '../editor/EditorView'
 import { LibraryView } from '../library/LibraryView'
 import { SettingsView } from '../settings/SettingsView'
 import { useAppStore } from '../../stores/appStore'
+import { useEditorStore } from '../../stores/editorStore'
 import { useMacroStore } from '../../stores/macroStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import type { AppStatus, Macro } from '@shared/types'
 
 export function AppShell(): JSX.Element {
   const activeView = useAppStore((s) => s.activeView)
+  const setActiveView = useAppStore((s) => s.setActiveView)
   const loadMacros = useMacroStore((s) => s.loadMacros)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
   const [showDonate, setShowDonate] = useState(false)
+  const [showDirtyDialog, setShowDirtyDialog] = useState(false)
+  const pendingNavRef = useRef<string | null>(null)
 
   useEffect(() => {
     loadMacros()
@@ -83,11 +88,57 @@ export function AppShell(): JSX.Element {
     return unsub
   }, [handleHotkeyAction])
 
+  // Navigation guard: intercept navigation away from editor when dirty
+  const handleNavigate = useCallback(
+    (viewId: string) => {
+      if (
+        activeView === 'editor' &&
+        viewId !== 'editor' &&
+        useEditorStore.getState().isDirty
+      ) {
+        pendingNavRef.current = viewId
+        setShowDirtyDialog(true)
+      } else {
+        setActiveView(viewId)
+      }
+    },
+    [activeView, setActiveView]
+  )
+
+  const handleSaveAndLeave = useCallback(async () => {
+    await useEditorStore.getState().saveMacro()
+    await loadMacros()
+    setShowDirtyDialog(false)
+    if (pendingNavRef.current) {
+      setActiveView(pendingNavRef.current)
+      pendingNavRef.current = null
+    }
+  }, [setActiveView, loadMacros])
+
+  const handleDiscard = useCallback(() => {
+    // Reload the macro to discard changes (reset isDirty)
+    const macro = useEditorStore.getState().macro
+    if (macro) {
+      // Just clear isDirty — the editor will reload if needed
+      useEditorStore.setState({ isDirty: false })
+    }
+    setShowDirtyDialog(false)
+    if (pendingNavRef.current) {
+      setActiveView(pendingNavRef.current)
+      pendingNavRef.current = null
+    }
+  }, [setActiveView])
+
+  const handleCancelNav = useCallback(() => {
+    setShowDirtyDialog(false)
+    pendingNavRef.current = null
+  }, [])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <TitleBar />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar onDonate={() => setShowDonate(true)} />
+        <Sidebar onDonate={() => setShowDonate(true)} onNavigate={handleNavigate} />
         <main
           style={{
             flex: 1,
@@ -105,6 +156,18 @@ export function AppShell(): JSX.Element {
       </div>
       <StatusBar />
       <DonateModal isOpen={showDonate} onClose={() => setShowDonate(false)} />
+      <ConfirmDialog
+        isOpen={showDirtyDialog}
+        title="Unsaved Changes"
+        message="You have unsaved changes in the editor. What would you like to do?"
+        confirmLabel="Save & Leave"
+        altLabel="Discard"
+        altColor="var(--danger)"
+        cancelLabel="Cancel"
+        onConfirm={handleSaveAndLeave}
+        onAlt={handleDiscard}
+        onCancel={handleCancelNav}
+      />
     </div>
   )
 }

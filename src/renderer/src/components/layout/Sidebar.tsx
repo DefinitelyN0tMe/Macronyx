@@ -64,9 +64,23 @@ const navItems: NavItem[] = [
   }
 ]
 
-export function Sidebar({ onDonate }: { onDonate?: () => void }): JSX.Element {
+export function Sidebar({
+  onDonate,
+  onNavigate
+}: {
+  onDonate?: () => void
+  onNavigate?: (viewId: string) => void
+}): JSX.Element {
   const activeView = useAppStore((s) => s.activeView)
   const setActiveView = useAppStore((s) => s.setActiveView)
+
+  const handleNav = (viewId: string): void => {
+    if (onNavigate) {
+      onNavigate(viewId)
+    } else {
+      setActiveView(viewId)
+    }
+  }
 
   return (
     <div
@@ -88,7 +102,7 @@ export function Sidebar({ onDonate }: { onDonate?: () => void }): JSX.Element {
         return (
           <button
             key={item.id}
-            onClick={() => setActiveView(item.id)}
+            onClick={() => handleNav(item.id)}
             title={item.label}
             style={{
               width: 40,

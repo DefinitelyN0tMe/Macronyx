@@ -5,6 +5,8 @@ const api = {
   startRecording: (options?: Record<string, unknown>) =>
     ipcRenderer.invoke(IPC.RECORDING_START, options),
   stopRecording: () => ipcRenderer.invoke(IPC.RECORDING_STOP),
+  pauseRecording: () => ipcRenderer.invoke(IPC.RECORDING_PAUSE),
+  resumeRecording: () => ipcRenderer.invoke(IPC.RECORDING_RESUME),
   onRecordingEvent: (callback: (event: unknown) => void) => {
     const listener = (_: unknown, event: unknown): void => callback(event)
     ipcRenderer.on(IPC.RECORDING_EVENT, listener)

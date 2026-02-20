@@ -4,8 +4,12 @@ interface ConfirmDialogProps {
   message: string
   confirmLabel?: string
   cancelLabel?: string
+  /** Optional third action (shown between cancel and confirm) */
+  altLabel?: string
+  altColor?: string
   onConfirm: () => void
   onCancel: () => void
+  onAlt?: () => void
 }
 
 export function ConfirmDialog({
@@ -14,8 +18,11 @@ export function ConfirmDialog({
   message,
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
+  altLabel,
+  altColor,
   onConfirm,
-  onCancel
+  onCancel,
+  onAlt
 }: ConfirmDialogProps): JSX.Element | null {
   if (!isOpen) return null
 
@@ -64,6 +71,23 @@ export function ConfirmDialog({
           >
             {cancelLabel}
           </button>
+          {altLabel && onAlt && (
+            <button
+              onClick={onAlt}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 6,
+                border: `1px solid ${altColor || 'var(--border-color)'}`,
+                background: 'transparent',
+                color: altColor || 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 500
+              }}
+            >
+              {altLabel}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             style={{

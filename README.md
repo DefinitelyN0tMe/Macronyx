@@ -22,6 +22,7 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 ### Recording
 - Record mouse movement, clicks (left/right/middle), and scroll wheel
 - Record keyboard input with key hold duration support
+- **Pause/resume recording** — pause mid-recording without stopping, continue from the same point
 - Configurable mouse sampling rate (8ms-100ms)
 - Selective capture — toggle mouse, keyboard, or scroll independently
 - Real-time event counter and timer during recording
@@ -37,10 +38,16 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 
 ### Timeline Editor
 - Visual timeline with separate mouse and keyboard tracks
-- Click to select and edit individual events
+- **Multi-select** — Ctrl+click to toggle, Shift+click for range select, Ctrl+A to select all
+- **Drag-and-drop** events on the timeline to reposition them in time
+- **Copy/paste** events with Ctrl+C / Ctrl+V
+- **Event grouping** — assign events to named groups with colored timeline bands
+- **Batch editing** — select multiple events and offset time, scale delays, or assign groups at once
 - Event inspector panel with editable properties (timestamp, position, key, delay)
+- **Smart delay smoothing** — moving-average smoothing with configurable window size and min/max clamping
 - Mouse path visualization canvas showing recorded cursor trajectory
-- Undo/redo support
+- **Auto-save** with dirty flag indicator and unsaved changes warning on navigation
+- Undo/redo support for all operations
 - Zoom and scroll navigation
 
 ### Macro Library
@@ -108,11 +115,14 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 ### Editing Macros
 
 1. Open a macro from the **Library** and click **Edit**
-2. Click events on the **Timeline** to select them
-3. Use the **Event Inspector** to adjust timestamps, positions, delays, and keys
-4. View the cursor path on the **Mouse Path Preview** canvas
-5. Undo/Redo for safe editing
-6. Click **Save** when done
+2. Click events on the **Timeline** to select them (Ctrl+click for multi-select, Shift+click for range)
+3. Drag events to reposition them, or use Ctrl+C / Ctrl+V to copy/paste
+4. Use the **Event Inspector** to adjust timestamps, positions, delays, and keys
+5. Select multiple events for batch editing — offset time, scale delays, or assign to groups
+6. Use **Smooth Delays** to clean up irregular timing in recordings
+7. View the cursor path on the **Mouse Path Preview** canvas
+8. Undo/Redo for safe editing — all operations are undoable
+9. Changes auto-save every 60 seconds, or click **Save** manually
 
 ### Silent Mode
 

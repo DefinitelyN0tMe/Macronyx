@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { useAppStore } from '../../stores/appStore'
 import { useMacroStore } from '../../stores/macroStore'
@@ -15,8 +15,10 @@ export function EditorView(): JSX.Element {
   const saveMacro = useEditorStore((s) => s.saveMacro)
   const renameMacro = useEditorStore((s) => s.renameMacro)
   const updateMacroDescription = useEditorStore((s) => s.updateMacroDescription)
+  const smoothDelays = useEditorStore((s) => s.smoothDelays)
   const zoom = useEditorStore((s) => s.zoom)
   const setZoom = useEditorStore((s) => s.setZoom)
+  const isDirty = useEditorStore((s) => s.isDirty)
   const historyIndex = useEditorStore((s) => s.historyIndex)
   const history = useEditorStore((s) => s.history)
   const setActiveView = useAppStore((s) => s.setActiveView)
@@ -29,6 +31,10 @@ export function EditorView(): JSX.Element {
   const [isEditingDesc, setIsEditingDesc] = useState(false)
   const [editDesc, setEditDesc] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [showSmoothPopover, setShowSmoothPopover] = useState(false)
+  const [smoothWindowSize, setSmoothWindowSize] = useState(5)
+  const [smoothMinDelay, setSmoothMinDelay] = useState(10)
+  const [smoothMaxDelay, setSmoothMaxDelay] = useState(2000)
 
   const handleSave = useCallback(async () => {
     setSaveStatus('saving')
@@ -46,6 +52,21 @@ export function EditorView(): JSX.Element {
   const handleStop = useCallback(async () => {
     await window.api.stopPlayback()
   }, [])
+
+  // Auto-save every 60s when dirty
+  const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    autoSaveTimerRef.current = setInterval(async () => {
+      const state = useEditorStore.getState()
+      if (state.isDirty && state.macro) {
+        await state.saveMacro()
+        await loadMacros()
+      }
+    }, 60000)
+    return () => {
+      if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
+    }
+  }, [loadMacros])
 
   if (!macro) {
     return (
@@ -252,6 +273,117 @@ export function EditorView(): JSX.Element {
             disabled={historyIndex >= history.length - 1}
             onClick={redo}
           />
+          <div style={{ position: 'relative' }}>
+            <ToolbarBtn
+              label="Smooth"
+              onClick={() => setShowSmoothPopover(!showSmoothPopover)}
+              disabled={macro.events.length === 0}
+            />
+            {showSmoothPopover && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 6,
+                  width: 220,
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 8,
+                  padding: 14,
+                  zIndex: 50,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Smooth Delays
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    Window size: {smoothWindowSize}
+                  </div>
+                  <input
+                    type="range"
+                    min={3}
+                    max={15}
+                    value={smoothWindowSize}
+                    onChange={(e) => setSmoothWindowSize(Number(e.target.value))}
+                    style={{ width: '100%', accentColor: 'var(--accent-cyan)' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      Min (ms)
+                    </div>
+                    <input
+                      type="number"
+                      value={smoothMinDelay}
+                      onChange={(e) => setSmoothMinDelay(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        padding: '4px 6px',
+                        borderRadius: 4,
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: 11,
+                        fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      Max (ms)
+                    </div>
+                    <input
+                      type="number"
+                      value={smoothMaxDelay}
+                      onChange={(e) => setSmoothMaxDelay(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        padding: '4px 6px',
+                        borderRadius: 4,
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        fontSize: 11,
+                        fontFamily: 'monospace'
+                      }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    smoothDelays({
+                      windowSize: smoothWindowSize,
+                      minDelay: smoothMinDelay,
+                      maxDelay: smoothMaxDelay
+                    })
+                    setShowSmoothPopover(false)
+                  }}
+                  style={{
+                    padding: '6px 0',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: 'var(--accent-cyan)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600
+                  }}
+                >
+                  Apply
+                </button>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+                  Undoable with Ctrl+Z
+                </div>
+              </div>
+            )}
+          </div>
           <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px', height: 20 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Zoom</span>
@@ -282,10 +414,25 @@ export function EditorView(): JSX.Element {
               fontSize: 12,
               fontWeight: 600,
               transition: 'background 0.2s',
-              minWidth: 60
+              minWidth: 60,
+              position: 'relative'
             }}
           >
-            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save'}
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : isDirty ? 'Save*' : 'Save'}
+            {isDirty && saveStatus === 'idle' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#f59e0b',
+                  border: '2px solid var(--bg-primary)'
+                }}
+              />
+            )}
           </button>
         </div>
       </div>
