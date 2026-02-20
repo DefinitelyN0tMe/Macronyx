@@ -7,8 +7,9 @@
 Record and replay mouse movements, clicks, scroll, and keyboard input with precision.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub release](https://img.shields.io/github/v/release/DefinitelyN0tMe/Macronyx)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
+[![GitHub release](https://img.shields.io/github/v/release/DefinitelyN0tMe/Macronyx?include_prereleases)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/DefinitelyN0tMe/Macronyx/total)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/DefinitelyN0tMe/Macronyx/build.yml?branch=main)](https://github.com/DefinitelyN0tMe/Macronyx/actions)
 
 [Download](#download) | [Features](#features) | [Usage](#usage) | [Build](#build-from-source) | [Contributing](#contributing)
 
@@ -18,63 +19,63 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 
 ## Features
 
-**Recording**
+### Recording
 - Record mouse movement, clicks (left/right/middle), and scroll wheel
 - Record keyboard input with key hold duration support
 - Configurable mouse sampling rate (8ms-100ms)
-- Selective capture (toggle mouse/keyboard/scroll independently)
+- Selective capture — toggle mouse, keyboard, or scroll independently
 - Real-time event counter and timer during recording
+- DPI-aware capture — works correctly on high-DPI / scaled displays
 
-**Playback**
+### Playback
 - Adjustable playback speed (0.25x to 4x)
-- Loop playback with configurable repeat count
-- Delay between loop iterations
+- Loop playback with configurable repeat count (or infinite loop)
+- Configurable delay between loop iterations
 - Pause/resume playback
 - Humanization mode — adds natural variance to timing and positions
+- DPI-aware playback — pixel-perfect cursor positioning on any display scaling
 
-**Timeline Editor**
+### Timeline Editor
 - Visual timeline with separate mouse and keyboard tracks
 - Click to select and edit individual events
-- Event inspector panel with editable properties (timestamp, position, key)
+- Event inspector panel with editable properties (timestamp, position, key, delay)
 - Mouse path visualization canvas showing recorded cursor trajectory
 - Undo/redo support
-- Zoom and scroll controls
+- Zoom and scroll navigation
 
-**Macro Library**
+### Macro Library
 - Save and organize recorded macros
 - Search macros by name, description, or tags
 - Import/export macros in `.macronyx` format
 - Grid and list view modes
+- Select a macro for hotkey-based playback
 
-**System Integration**
-- Global hotkeys work even when the app is not focused
-  - `F9` Start recording
-  - `F10` Stop recording
-  - `F11` Start playback
-  - `Shift+F11` Stop playback
-  - `Escape` Emergency stop
-- System tray with silent mode — minimizes and stays out of the way
-- All hotkeys are fully customizable
+### System Integration
+- Global hotkeys work even when the app is not focused:
+  | Action | Default Hotkey |
+  |--------|---------------|
+  | Start recording | `F9` |
+  | Stop recording | `F10` |
+  | Start playback | `F11` |
+  | Stop playback | `Shift+F11` |
+  | Emergency stop | `Escape` |
+- System tray — minimize to tray and control via hotkeys
+- All hotkeys are fully customizable in Settings
 
-**Cross-Platform**
-- Windows (installer + portable)
-- macOS (DMG + ZIP)
-- Linux (AppImage + DEB)
-- Portable mode — runs from USB drive, stores data alongside the executable
+### Cross-Platform
+| Platform | Installer | Portable / Standalone |
+|----------|-----------|----------------------|
+| Windows  | `.exe` setup | `.exe` portable |
+| macOS    | `.dmg` | `.zip` |
+| Linux    | `.deb` | `.AppImage` |
 
 ---
 
 ## Download
 
-Download the latest release for your platform:
+**[Download Latest Release](https://github.com/DefinitelyN0tMe/Macronyx/releases/latest)**
 
-**[Latest Release](https://github.com/DefinitelyN0tMe/Macronyx/releases/latest)**
-
-| Platform | Installer | Portable |
-|----------|-----------|----------|
-| Windows  | `.exe` setup | `.exe` portable |
-| macOS    | `.dmg` | `.zip` |
-| Linux    | `.deb` | `.AppImage` |
+> **Windows users**: choose `macronyx-*-setup.exe` for the installer or `macronyx-*-portable.exe` for a single-file portable version.
 
 ---
 
@@ -83,33 +84,34 @@ Download the latest release for your platform:
 ### Quick Start
 
 1. Open Macronyx
-2. Go to **Recorder** tab
-3. Click the red record button (or press `F9`)
-4. Perform your actions — move mouse, click, type
-5. Click stop (or press `F10`)
-6. Your macro is saved automatically in the Library
+2. Go to the **Recorder** tab
+3. Press `F9` (or click the record button) to start recording
+4. Perform your actions — move the mouse, click, scroll, type
+5. Press `F10` to stop recording
+6. Your macro appears in the **Library** automatically
 7. Select a macro and press `F11` to play it back
 
 ### Editing Macros
 
-1. Open a macro from the **Library**
-2. Click **Edit** to open the **Timeline Editor**
-3. Click events on the timeline to inspect and edit them
-4. Adjust timestamps, positions, and delays
-5. Use Undo/Redo for safe editing
+1. Open a macro from the **Library** and click **Edit**
+2. Click events on the **Timeline** to select them
+3. Use the **Event Inspector** to adjust timestamps, positions, delays, and keys
+4. View the cursor path on the **Mouse Path Preview** canvas
+5. Undo/Redo for safe editing
 6. Click **Save** when done
 
 ### Silent Mode
 
 1. Enable **Minimize to Tray** in Settings > General
-2. When you close the window, Macronyx stays in the system tray
-3. Use global hotkeys to control recording/playback without the window
+2. Close the window — Macronyx keeps running in the system tray
+3. Use global hotkeys to control recording and playback without the window
 
 ### Portable Mode
 
-1. Create a file named `portable` (no extension) next to the Macronyx executable
-2. Macronyx will store all data in a `data/` folder next to the executable
-3. Perfect for USB drives
+1. Download the portable `.exe`
+2. Create an empty file named `portable` (no file extension) in the same folder
+3. Macronyx stores all settings and macros in a `data/` subfolder next to the executable
+4. Move the entire folder to a USB drive for on-the-go use
 
 ---
 
@@ -121,23 +123,23 @@ Download the latest release for your platform:
 - npm 9+
 - Git
 
-### Linux additional requirements
+#### Linux additional packages
 
 ```bash
 sudo apt install libx11-dev libxtst-dev libpng-dev
 ```
 
-### Steps
+### Build
 
 ```bash
 git clone https://github.com/DefinitelyN0tMe/Macronyx.git
 cd Macronyx
 npm install
-npm run dev        # Development mode
-npm run build      # Build for production
-npm run build:win  # Package for Windows
-npm run build:mac  # Package for macOS
-npm run build:linux # Package for Linux
+npm run dev          # Development mode with hot reload
+npm run build        # Build for production
+npm run build:win    # Package for Windows
+npm run build:mac    # Package for macOS
+npm run build:linux  # Package for Linux
 ```
 
 ---
@@ -148,18 +150,29 @@ npm run build:linux # Package for Linux
 |-----------|-----------|
 | Framework | Electron + electron-vite |
 | Frontend  | React 19 + TypeScript |
-| UI        | Mantine v7 (dark theme) |
+| UI        | Mantine v7 |
 | State     | Zustand |
 | Input Capture | uiohook-napi |
+| Input Simulation | Platform-native (SendInput / xdotool / CGEvent) |
 | Packaging | electron-builder |
 
 ---
 
-## Permissions
+## Platform Notes
 
-- **macOS**: Macronyx requires Accessibility permissions to record and replay input. Go to System Settings > Privacy & Security > Accessibility and add Macronyx.
-- **Linux**: May require `libx11-dev` and `libxtst-dev`. On Wayland, X11 compatibility layer may be needed.
-- **Windows**: No special permissions required.
+### Windows
+- No special permissions required
+- Works with any DPI scaling (100%-300%+)
+- Input simulation uses Win32 `SendInput` API for reliable, DPI-aware playback
+
+### macOS
+- Requires **Accessibility** permissions: System Settings > Privacy & Security > Accessibility
+- On first launch, right-click > Open to bypass Gatekeeper
+
+### Linux
+- Requires X11 (`libx11-dev`, `libxtst-dev`)
+- On Wayland, the X11 compatibility layer (XWayland) may be needed
+- AppImage: run `chmod +x Macronyx-*.AppImage` before launching
 
 ---
 

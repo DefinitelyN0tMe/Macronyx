@@ -78,7 +78,6 @@ jobs:
             dist/*.zip
             dist/*.AppImage
             dist/*.deb
-            dist/*.blockmap
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -94,6 +93,31 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
+          generate_release_notes: true
+          body: |
+            ## Installation
+
+            | Platform | Installer | Portable / Standalone |
+            |----------|-----------|----------------------|
+            | **Windows** | `macronyx-*-setup.exe` | `macronyx-*-portable.exe` |
+            | **macOS** | `Macronyx-*.dmg` | `Macronyx-*-mac.zip` |
+            | **Linux** | `macronyx_*.deb` | `Macronyx-*.AppImage` |
+
+            ### Windows
+            - **Setup** — standard installer with optional install directory
+            - **Portable** — single `.exe`, no installation needed. Create an empty file named `portable` (no extension) next to the exe for local data storage
+
+            ### macOS
+            - Requires Accessibility permissions: System Settings > Privacy & Security > Accessibility
+            - On first launch, right-click > Open to bypass Gatekeeper
+
+            ### Linux
+            - AppImage: `chmod +x Macronyx-*.AppImage && ./Macronyx-*.AppImage`
+            - DEB: `sudo dpkg -i macronyx_*.deb`
+
+            ---
+
+            Full documentation: [README](https://github.com/DefinitelyN0tMe/Macronyx#readme)
           files: |
             macronyx-win/**
             macronyx-mac/**
