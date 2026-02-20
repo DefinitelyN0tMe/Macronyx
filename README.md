@@ -7,7 +7,7 @@
 Record and replay mouse movements, clicks, scroll, and keyboard input with precision.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub release](https://img.shields.io/github/v/release/DefinitelyN0tMe/Macronyx?include_prereleases)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
+[![GitHub release](https://img.shields.io/github/v/release/DefinitelyN0tMe/Macronyx)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/DefinitelyN0tMe/Macronyx/total)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/DefinitelyN0tMe/Macronyx/build.yml?branch=main)](https://github.com/DefinitelyN0tMe/Macronyx/actions)
 
@@ -109,9 +109,11 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 ### Portable Mode
 
 1. Download the portable `.exe`
-2. Create an empty file named `portable` (no file extension) in the same folder
-3. Macronyx stores all settings and macros in a `data/` subfolder next to the executable
+2. Launch it, go to **Settings > Advanced** and click **Enable** next to Portable Mode
+3. Restart the app — settings and macros are now stored in a `data/` subfolder next to the executable
 4. Move the entire folder to a USB drive for on-the-go use
+
+> You can also enable portable mode manually by creating an empty file named `portable` (no extension) next to the exe.
 
 ---
 

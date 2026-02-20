@@ -105,7 +105,7 @@ jobs:
 
             ### Windows
             - **Setup** — standard installer with optional install directory
-            - **Portable** — single `.exe`, no installation needed. Create an empty file named `portable` (no extension) next to the exe for local data storage
+            - **Portable** — single `.exe`, no installation needed. Enable portable data storage in Settings > Advanced > Portable Mode
 
             ### macOS
             - Requires Accessibility permissions: System Settings > Privacy & Security > Accessibility
