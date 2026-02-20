@@ -38,7 +38,10 @@ export const IPC = {
   APP_STATUS: 'app:status',
 
   PORTABLE_STATUS: 'portable:status',
-  PORTABLE_TOGGLE: 'portable:toggle'
+  PORTABLE_TOGGLE: 'portable:toggle',
+
+  OVERLAY_STATUS: 'overlay:status',
+  OVERLAY_SHOW_MAIN: 'overlay:showMain'
 } as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -46,7 +49,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     startMinimized: false,
     minimizeToTray: true,
     launchOnStartup: false,
-    portableMode: false
+    portableMode: false,
+    showOverlayWidget: true
   },
   recording: {
     captureMouseMovement: true,

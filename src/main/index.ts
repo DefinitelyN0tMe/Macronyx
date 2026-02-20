@@ -1,9 +1,17 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers, cleanupIpc, getAppSettings } from './ipc'
 import { TrayManager } from './tray'
 import { appState } from './app-state'
+import {
+  createOverlayWindow,
+  showOverlay,
+  hideOverlay,
+  setOverlayEnabled,
+  destroyOverlay
+} from './overlay'
+import { IPC } from '../shared/constants'
 
 let mainWindow: BrowserWindow | null = null
 let trayManager: TrayManager | null = null
@@ -39,6 +47,22 @@ function createWindow(): void {
     }
   })
 
+  // Show overlay when main window is hidden/minimized
+  mainWindow.on('hide', () => {
+    showOverlay()
+  })
+  mainWindow.on('minimize', () => {
+    showOverlay()
+  })
+
+  // Hide overlay when main window is shown/restored
+  mainWindow.on('show', () => {
+    hideOverlay()
+  })
+  mainWindow.on('restore', () => {
+    hideOverlay()
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -58,10 +82,29 @@ app.whenReady().then(async () => {
     const settings = await getAppSettings()
     appState.minimizeToTray = settings.general.minimizeToTray
 
+    // Initialize overlay widget setting
+    const overlayEnabled = settings.general.showOverlayWidget !== false
+    setOverlayEnabled(overlayEnabled)
+
+    // Pre-create overlay window so it loads fast
+    if (overlayEnabled) {
+      createOverlayWindow()
+    }
+
+    // Listen for "show main window" from overlay
+    ipcMain.on(IPC.OVERLAY_SHOW_MAIN, () => {
+      if (mainWindow) {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    })
+
     // Handle startMinimized
     mainWindow.on('ready-to-show', () => {
       if (settings.general.startMinimized) {
         // Don't show the window — it stays hidden, accessible via tray
+        // Show overlay instead since window is hidden
+        showOverlay()
       } else {
         mainWindow?.show()
       }
@@ -87,4 +130,5 @@ app.on('before-quit', () => {
   appState.isQuitting = true
   cleanupIpc()
   trayManager?.destroy()
+  destroyOverlay()
 })

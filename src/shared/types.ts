@@ -53,6 +53,7 @@ export interface AppSettings {
     minimizeToTray: boolean
     launchOnStartup: boolean
     portableMode: boolean
+    showOverlayWidget: boolean
   }
   recording: {
     captureMouseMovement: boolean

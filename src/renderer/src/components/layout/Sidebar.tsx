@@ -64,7 +64,7 @@ const navItems: NavItem[] = [
   }
 ]
 
-export function Sidebar(): JSX.Element {
+export function Sidebar({ onDonate }: { onDonate?: () => void }): JSX.Element {
   const activeView = useAppStore((s) => s.activeView)
   const setActiveView = useAppStore((s) => s.setActiveView)
 
@@ -78,6 +78,7 @@ export function Sidebar(): JSX.Element {
         flexDirection: 'column',
         alignItems: 'center',
         paddingTop: 8,
+        paddingBottom: 8,
         gap: 2,
         flexShrink: 0
       }}
@@ -134,6 +135,48 @@ export function Sidebar(): JSX.Element {
           </button>
         )
       })}
+
+      {/* Spacer pushes donate to bottom */}
+      <div style={{ flex: 1 }} />
+
+      {/* Donate button */}
+      {onDonate && (
+        <button
+          onClick={onDonate}
+          title="Support Macronyx"
+          style={{
+            width: 40,
+            height: 40,
+            border: 'none',
+            borderRadius: 8,
+            background: 'transparent',
+            color: '#6b7280',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)'
+            e.currentTarget.style.color = '#ec4899'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = '#6b7280'
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            stroke="none"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }

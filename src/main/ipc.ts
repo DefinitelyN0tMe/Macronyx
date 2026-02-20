@@ -11,6 +11,7 @@ import { SettingsStorage } from './storage/settings'
 import { ProfileStorage } from './storage/profiles'
 import { appState } from './app-state'
 import { getPortableMarkerPath } from './utils/paths'
+import { updateOverlayStatus, setOverlayEnabled } from './overlay'
 
 let recorder: Recorder | null = null
 let player: Player | null = null
@@ -55,6 +56,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       })
 
       mainWindow.webContents.send(IPC.APP_STATUS, 'recording')
+      updateOverlayStatus('recording', 0)
       mainWindow.webContents.send(IPC.RECORDING_STATUS, {
         isRecording: true,
         eventCount: 0,
@@ -96,6 +98,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       await macroStorage!.save(macro)
       currentRecordingEvents = []
       mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+      updateOverlayStatus('idle')
       mainWindow.webContents.send(IPC.RECORDING_STATUS, {
         isRecording: false,
         eventCount: events.length,
@@ -126,8 +129,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       }
 
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+      updateOverlayStatus('playing', 0)
       player!.play(macro, (state: PlaybackState) => {
         mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
+        updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs)
         if (state.status === 'idle') {
           mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
         }
@@ -141,18 +146,21 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.PLAYBACK_STOP, async () => {
     player!.stop()
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+    updateOverlayStatus('idle')
     return { success: true }
   })
 
   ipcMain.handle(IPC.PLAYBACK_PAUSE, async () => {
     player!.pause()
     mainWindow.webContents.send(IPC.APP_STATUS, 'paused')
+    updateOverlayStatus('paused')
     return { success: true }
   })
 
   ipcMain.handle(IPC.PLAYBACK_RESUME, async () => {
     player!.resume()
     mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+    updateOverlayStatus('playing')
     return { success: true }
   })
 
@@ -241,6 +249,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       setupHotkeys(mainWindow, updated)
       // Update minimize-to-tray behavior in shared state
       appState.minimizeToTray = updated.general.minimizeToTray
+      // Update overlay widget enabled state
+      setOverlayEnabled(updated.general.showOverlayWidget !== false)
       return { success: true, settings: updated }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -334,6 +344,7 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
     recorder?.stop()
     player?.stop()
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+    updateOverlayStatus('idle')
     if (!mainWindow.isVisible()) {
       mainWindow.show()
       mainWindow.focus()

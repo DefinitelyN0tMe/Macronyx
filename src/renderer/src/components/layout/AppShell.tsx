@@ -1,7 +1,8 @@
-import { useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TitleBar } from './TitleBar'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
+import { DonateModal } from '../common/DonateModal'
 import { DashboardView } from '../dashboard/DashboardView'
 import { RecorderView } from '../recorder/RecorderView'
 import { EditorView } from '../editor/EditorView'
@@ -16,6 +17,7 @@ export function AppShell(): JSX.Element {
   const activeView = useAppStore((s) => s.activeView)
   const loadMacros = useMacroStore((s) => s.loadMacros)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
+  const [showDonate, setShowDonate] = useState(false)
 
   useEffect(() => {
     loadMacros()
@@ -85,7 +87,7 @@ export function AppShell(): JSX.Element {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <TitleBar />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar />
+        <Sidebar onDonate={() => setShowDonate(true)} />
         <main
           style={{
             flex: 1,
@@ -102,6 +104,7 @@ export function AppShell(): JSX.Element {
         </main>
       </div>
       <StatusBar />
+      <DonateModal isOpen={showDonate} onClose={() => setShowDonate(false)} />
     </div>
   )
 }

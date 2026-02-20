@@ -79,7 +79,17 @@ const api = {
     return () => {
       ipcRenderer.removeListener('hotkey:action', listener)
     }
-  }
+  },
+
+  // Overlay widget
+  onOverlayStatus: (callback: (data: unknown) => void) => {
+    const listener = (_: unknown, data: unknown): void => callback(data)
+    ipcRenderer.on(IPC.OVERLAY_STATUS, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.OVERLAY_STATUS, listener)
+    }
+  },
+  showMainFromOverlay: () => ipcRenderer.send(IPC.OVERLAY_SHOW_MAIN)
 }
 
 contextBridge.exposeInMainWorld('api', api)

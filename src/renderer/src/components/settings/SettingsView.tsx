@@ -178,6 +178,15 @@ function GeneralSettings({
           onChange={(v) => onUpdate({ general: { ...settings.general, launchOnStartup: v } })}
         />
       </SettingRow>
+      <SettingRow
+        label="Status Widget"
+        description="Show a floating status overlay when the app is minimized"
+      >
+        <Toggle
+          checked={settings.general.showOverlayWidget !== false}
+          onChange={(v) => onUpdate({ general: { ...settings.general, showOverlayWidget: v } })}
+        />
+      </SettingRow>
     </>
   )
 }
@@ -378,8 +387,8 @@ function AdvancedSettings(): JSX.Element {
 
   return (
     <>
-      <SettingRow label="Version" description="Macronyx v1.0.0">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.0.0</span>
+      <SettingRow label="Version" description="Macronyx v1.1.0">
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.1.0</span>
       </SettingRow>
       <SettingRow
         label="Portable Mode"
