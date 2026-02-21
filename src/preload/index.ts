@@ -50,6 +50,21 @@ const api = {
   importMacro: () => ipcRenderer.invoke(IPC.MACRO_IMPORT),
   updateMacro: (macro: unknown) => ipcRenderer.invoke(IPC.MACRO_UPDATE, macro),
 
+  // Chains
+  saveChain: (chain: unknown) => ipcRenderer.invoke(IPC.CHAIN_SAVE, chain),
+  loadChain: (id: string) => ipcRenderer.invoke(IPC.CHAIN_LOAD, id),
+  deleteChain: (id: string) => ipcRenderer.invoke(IPC.CHAIN_DELETE, id),
+  listChains: () => ipcRenderer.invoke(IPC.CHAIN_LIST),
+  playChain: (chainId: string) => ipcRenderer.invoke(IPC.CHAIN_PLAY, chainId),
+  stopChain: () => ipcRenderer.invoke(IPC.CHAIN_STOP),
+  onChainProgress: (callback: (state: unknown) => void) => {
+    const listener = (_: unknown, state: unknown): void => callback(state)
+    ipcRenderer.on(IPC.CHAIN_PROGRESS, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.CHAIN_PROGRESS, listener)
+    }
+  },
+
   getSettings: () => ipcRenderer.invoke(IPC.SETTINGS_GET),
   setSettings: (settings: unknown) => ipcRenderer.invoke(IPC.SETTINGS_SET, settings),
 
@@ -60,6 +75,11 @@ const api = {
 
   getPortableStatus: () => ipcRenderer.invoke(IPC.PORTABLE_STATUS),
   togglePortable: (enable: boolean) => ipcRenderer.invoke(IPC.PORTABLE_TOGGLE, enable),
+
+  // Active window info
+  getActiveWindow: () => ipcRenderer.invoke(IPC.ACTIVE_WINDOW_INFO),
+  // Pixel sampling
+  getPixelColor: (x: number, y: number) => ipcRenderer.invoke(IPC.PIXEL_SAMPLE, x, y),
 
   minimizeWindow: () => ipcRenderer.send(IPC.WINDOW_MINIMIZE),
   maximizeWindow: () => ipcRenderer.send(IPC.WINDOW_MAXIMIZE),
@@ -80,6 +100,24 @@ const api = {
     ipcRenderer.on('hotkey:action', listener)
     return () => {
       ipcRenderer.removeListener('hotkey:action', listener)
+    }
+  },
+
+  // Triggers
+  onTriggerFired: (callback: (data: unknown) => void) => {
+    const listener = (_: unknown, data: unknown): void => callback(data)
+    ipcRenderer.on(IPC.TRIGGER_FIRED, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.TRIGGER_FIRED, listener)
+    }
+  },
+
+  // Profile auto-switch notification
+  onProfileActivated: (callback: (data: unknown) => void) => {
+    const listener = (_: unknown, data: unknown): void => callback(data)
+    ipcRenderer.on(IPC.PROFILE_ACTIVATED, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.PROFILE_ACTIVATED, listener)
     }
   },
 

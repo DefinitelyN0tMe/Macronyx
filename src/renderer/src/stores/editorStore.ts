@@ -43,6 +43,7 @@ interface EditorState {
   ungroupEvents: (ids: string[]) => void
   renameGroup: (oldName: string, newName: string) => void
   smoothDelays: (options: SmoothDelaysOptions) => void
+  insertCondition: () => void
   setZoom: (zoom: number) => void
   setScrollOffset: (offset: number) => void
   setPlayheadMs: (ms: number) => void
@@ -296,6 +297,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set(pushHistory(macro, events, history, historyIndex, 'Smooth delays'))
+  },
+
+  insertCondition: () => {
+    const { macro, history, historyIndex } = get()
+    if (!macro) return
+    const pairId = uuid()
+    const macroEnd = macro.events.length > 0
+      ? Math.max(...macro.events.map((e) => e.timestamp))
+      : 0
+    const condStart: MacroEvent = {
+      id: uuid(),
+      type: 'condition_start',
+      timestamp: macroEnd + 100,
+      delay: 100,
+      conditionPairId: pairId,
+      condition: { type: 'pixel_color', x: 0, y: 0, color: { r: 255, g: 0, b: 0 }, tolerance: 30 }
+    }
+    const condElse: MacroEvent = {
+      id: uuid(),
+      type: 'condition_else',
+      timestamp: macroEnd + 200,
+      delay: 100,
+      conditionPairId: pairId
+    }
+    const condEnd: MacroEvent = {
+      id: uuid(),
+      type: 'condition_end',
+      timestamp: macroEnd + 300,
+      delay: 100,
+      conditionPairId: pairId
+    }
+    const events = [...macro.events, condStart, condElse, condEnd]
+    const result = pushHistory(macro, events, history, historyIndex, 'Insert condition')
+    set({
+      ...result,
+      selectedEventIds: [condStart.id]
+    })
   },
 
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),

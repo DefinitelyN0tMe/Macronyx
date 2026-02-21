@@ -5,6 +5,33 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-21 — "Playback Intelligence"
+
+### Added
+- **Trigger-based macros** — start macros automatically via hotkey combos, cron schedules, window focus changes, or pixel color matches
+- **Profile auto-switch** — automatically activate a settings profile when a specific application gains focus (match by process name, window title, or regex)
+- **Macro chaining** — run macros sequentially (A → B → C) with configurable delays between steps; drag-to-reorder, per-step enable/disable
+- **Conditional logic** — if/else branching inside macros based on pixel color, window title, or time of day; flat event model with nesting support
+- **Relative positioning mode** — record mouse coordinates relative to the active window so macros adapt when windows move or resize
+- **Playback preview** — animated cursor visualization on the mouse path canvas without moving the real cursor; shows click flashes, key labels, and a progress bar
+- **Active Window Service** — cross-platform polling service (Win32 GetForegroundWindow, xdotool, osascript) that detects foreground window changes
+- **Pixel Color Sampling** — cross-platform pixel reader (Win32 GetPixel, ImageMagick, screencapture) for trigger and condition evaluation
+- **Chain Editor UI** — dedicated sidebar view for creating and managing macro chains with step reordering and playback controls
+- **Trigger Panel** — per-macro trigger configuration with editors for all four trigger types (hotkey recorder, cron input, window matcher, pixel picker)
+- **Condition Inspector** — inline editor for condition events: pixel color picker with tolerance, window title pattern, and time-of-day range
+- Settings toggles: Enable Triggers, Auto-Switch Profiles, Relative Positioning
+- Profile auto-switch rules table in Settings (profile picker, match type, match value)
+- "Chains" navigation item in sidebar
+- "+ IF" toolbar button in editor for inserting condition blocks
+- Timeline/Triggers tab switcher in editor
+- Logic track on timeline for condition events (IF/ELSE/END badges)
+
+### Changed
+- Emergency stop now also halts chain playback and trigger-fired macros
+- Player supports conditional branch evaluation and relative position resolution during playback
+- Recorder attaches window-relative offsets when relative positioning is enabled
+- HotkeyManager extended with dynamic trigger hotkey registration
+
 ## [1.2.0] - 2025-02-21 — "Editor Power-Up"
 
 ### Added

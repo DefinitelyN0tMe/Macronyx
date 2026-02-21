@@ -2,23 +2,33 @@ import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { v4 as uuid } from 'uuid'
 import * as fs from 'fs'
 import { IPC } from '../shared/constants'
-import type { Macro, MacroEvent, AppSettings, PlaybackState } from '../shared/types'
+import type { Macro, MacroEvent, AppSettings, PlaybackState, MacroChain } from '../shared/types'
 import { Recorder } from './engine/recorder'
 import { Player } from './engine/player'
+import { ChainPlayer } from './engine/chain-player'
 import { HotkeyManager } from './engine/hotkeys'
 import { MacroStorage } from './storage/macros'
+import { ChainStorage } from './storage/chains'
 import { SettingsStorage } from './storage/settings'
 import { ProfileStorage } from './storage/profiles'
+import { ProfileSwitcher } from './engine/profile-switcher'
+import { TriggerManager } from './engine/trigger-manager'
+import { getActiveWindowService, destroyActiveWindowService } from './engine/active-window'
+import { getPixelSampler } from './engine/pixel-sampler'
 import { appState } from './app-state'
 import { getPortableMarkerPath } from './utils/paths'
 import { updateOverlayStatus, setOverlayEnabled } from './overlay'
 
 let recorder: Recorder | null = null
 let player: Player | null = null
+let chainPlayer: ChainPlayer | null = null
 let hotkeyManager: HotkeyManager | null = null
 let macroStorage: MacroStorage | null = null
+let chainStorage: ChainStorage | null = null
 let settingsStorage: SettingsStorage | null = null
 let profileStorage: ProfileStorage | null = null
+let profileSwitcher: ProfileSwitcher | null = null
+let triggerManager: TriggerManager | null = null
 let currentRecordingEvents: MacroEvent[] = []
 let recordingStartTime = 0
 let recordingPausedAt = 0
@@ -68,10 +78,12 @@ function cleanupOrphanedKeyDowns(): void {
 
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   macroStorage = new MacroStorage()
+  chainStorage = new ChainStorage()
   settingsStorage = new SettingsStorage()
   profileStorage = new ProfileStorage()
   recorder = new Recorder()
   player = new Player()
+  chainPlayer = new ChainPlayer(player)
   hotkeyManager = new HotkeyManager()
 
   // Window controls
@@ -95,6 +107,15 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       recordingStartTime = Date.now()
       recordingPausedAt = 0
       recordingAccumulatedPause = 0
+
+      // Start active window service if relative positioning is enabled
+      if (settings.recording.relativePositioning) {
+        try {
+          getActiveWindowService().start(200)
+        } catch {
+          // Non-fatal — recording works without it
+        }
+      }
 
       recorder!.start(settings.recording, (event: MacroEvent) => {
         currentRecordingEvents.push(event)
@@ -218,7 +239,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       if (!macro) return { success: false, error: 'Macro not found' }
 
       // Always apply the current global default playback settings so that
-      // changes in Settings → Playback take effect immediately for all macros.
+      // changes in Settings > Playback take effect immediately for all macros.
       const currentSettings = await settingsStorage!.get()
       macro.playbackSettings = {
         speed: currentSettings.playback.defaultSpeed,
@@ -306,6 +327,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     try {
       macro.updatedAt = new Date().toISOString()
       await macroStorage!.save(macro)
+      // Reload triggers if triggers are enabled
+      const settings = await settingsStorage!.get()
+      if (settings.general.enableTriggers && triggerManager) {
+        await reloadTriggers()
+      }
       return { success: true }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -348,6 +374,84 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     }
   })
 
+  // ─── Chains ─────────────────────────────────────────────────────────
+  ipcMain.handle(IPC.CHAIN_SAVE, async (_e, chain: MacroChain) => {
+    try {
+      await chainStorage!.save(chain)
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.CHAIN_LOAD, async (_e, id: string) => {
+    return await chainStorage!.load(id)
+  })
+
+  ipcMain.handle(IPC.CHAIN_DELETE, async (_e, id: string) => {
+    try {
+      await chainStorage!.delete(id)
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.CHAIN_LIST, async () => {
+    return await chainStorage!.list()
+  })
+
+  ipcMain.handle(IPC.CHAIN_PLAY, async (_e, chainId: string) => {
+    try {
+      const chain = await chainStorage!.load(chainId)
+      if (!chain) return { success: false, error: 'Chain not found' }
+
+      mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+      updateOverlayStatus('playing')
+
+      chainPlayer!.play(
+        chain,
+        async (macroId: string) => macroStorage!.load(macroId),
+        (state) => {
+          mainWindow.webContents.send(IPC.CHAIN_PROGRESS, state)
+          if (state.status === 'idle') {
+            mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+            updateOverlayStatus('idle')
+          }
+        }
+      )
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.CHAIN_STOP, async () => {
+    chainPlayer!.stop()
+    mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+    updateOverlayStatus('idle')
+    return { success: true }
+  })
+
+  // ─── Active window & pixel sampling ──────────────────────────────────
+  ipcMain.handle(IPC.ACTIVE_WINDOW_INFO, async () => {
+    try {
+      const awService = getActiveWindowService()
+      return await awService.pollOnce()
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle(IPC.PIXEL_SAMPLE, async (_e, x: number, y: number) => {
+    try {
+      const sampler = getPixelSampler()
+      return await sampler.getPixelColor(x, y)
+    } catch {
+      return null
+    }
+  })
+
   // Settings
   ipcMain.handle(IPC.SETTINGS_GET, async () => {
     return await settingsStorage!.get()
@@ -362,6 +466,23 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       appState.minimizeToTray = updated.general.minimizeToTray
       // Update overlay widget enabled state
       setOverlayEnabled(updated.general.showOverlayWidget !== false)
+
+      // Start/stop trigger manager based on setting
+      if (updated.general.enableTriggers) {
+        await startTriggerManager(mainWindow)
+      } else if (triggerManager) {
+        triggerManager.stop()
+        triggerManager = null
+      }
+
+      // Start/stop profile auto-switch
+      if (updated.general.autoSwitchProfiles) {
+        startProfileSwitcher(mainWindow, updated)
+      } else if (profileSwitcher) {
+        profileSwitcher.stop()
+        profileSwitcher = null
+      }
+
       return { success: true, settings: updated }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -430,10 +551,108 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     }
   })
 
-  // Initialize hotkeys
-  settingsStorage.get().then((settings) => {
+  // Initialize hotkeys and services on startup
+  settingsStorage.get().then(async (settings) => {
     setupHotkeys(mainWindow, settings)
+
+    // Start active window service (needed for triggers, profile auto-switch, relative positioning)
+    try {
+      getActiveWindowService().start(500)
+    } catch {
+      // Non-fatal
+    }
+
+    // Start trigger manager if enabled
+    if (settings.general.enableTriggers) {
+      await startTriggerManager(mainWindow)
+    }
+
+    // Start profile auto-switch if enabled
+    if (settings.general.autoSwitchProfiles) {
+      startProfileSwitcher(mainWindow, settings)
+    }
   })
+}
+
+/** Initialize or re-initialize the trigger manager */
+async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
+  if (triggerManager) {
+    triggerManager.stop()
+  }
+
+  triggerManager = new TriggerManager(
+    getActiveWindowService(),
+    getPixelSampler(),
+    hotkeyManager!
+  )
+
+  triggerManager.on('trigger-fired', async (data: { triggerId: string; macroId: string; type: string }) => {
+    mainWindow.webContents.send(IPC.TRIGGER_FIRED, data)
+    // Auto-play the macro
+    try {
+      const macro = await macroStorage!.load(data.macroId)
+      if (macro) {
+        const currentSettings = await settingsStorage!.get()
+        macro.playbackSettings = {
+          speed: currentSettings.playback.defaultSpeed,
+          repeatCount: currentSettings.playback.defaultRepeatCount,
+          repeatDelay: currentSettings.playback.defaultRepeatDelay,
+          humanize: currentSettings.playback.defaultHumanize,
+          humanizeAmount: currentSettings.playback.defaultHumanizeAmount
+        }
+        mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+        updateOverlayStatus('playing')
+        player!.play(macro, (state: PlaybackState) => {
+          mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
+          if (state.status === 'idle') {
+            mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+            updateOverlayStatus('idle')
+          }
+        })
+      }
+    } catch (err) {
+      console.error('Trigger playback error:', err)
+    }
+  })
+
+  await reloadTriggers()
+  triggerManager.start()
+}
+
+/** Reload triggers from all macros */
+async function reloadTriggers(): Promise<void> {
+  if (!triggerManager || !macroStorage) return
+  const macros = await macroStorage.list()
+  // Load full macros to get trigger configs
+  const fullMacros: Macro[] = []
+  for (const summary of macros) {
+    const full = await macroStorage.load(summary.id)
+    if (full) fullMacros.push(full)
+  }
+  triggerManager.loadTriggers(fullMacros)
+}
+
+/** Initialize profile auto-switch */
+function startProfileSwitcher(mainWindow: BrowserWindow, settings: AppSettings): void {
+  if (profileSwitcher) {
+    profileSwitcher.stop()
+  }
+
+  profileSwitcher = new ProfileSwitcher(getActiveWindowService())
+  profileSwitcher.setRules(settings.profileRules || [])
+  profileSwitcher.onSwitch = async (profileId: string) => {
+    try {
+      const profile = await profileStorage!.activate(profileId)
+      if (profile) {
+        await settingsStorage!.set(profile.settings)
+        setupHotkeys(mainWindow, profile.settings)
+        mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId, profileName: profile.name })
+      }
+    } catch (err) {
+      console.error('Profile auto-switch error:', err)
+    }
+  }
+  profileSwitcher.start()
 }
 
 function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
@@ -455,7 +674,7 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
     mainWindow.webContents.send('hotkey:action', 'playStop')
   })
   hotkeyManager.setCallback('emergencyStop', () => {
-    // Stop all recording/playback and reset all state
+    // Stop all recording/playback/chains and reset all state
     playbackPaused = false
     recordingPausedAt = 0
     recordingAccumulatedPause = 0
@@ -465,6 +684,9 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
     if (player) {
       // player.stop() also releases held keys via releaseAllHeldKeys()
       player.stop()
+    }
+    if (chainPlayer) {
+      chainPlayer.stop()
     }
     currentRecordingEvents = []
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
@@ -487,10 +709,23 @@ export function cleanupIpc(): void {
     player.destroy()
     player = null
   }
+  if (chainPlayer) {
+    chainPlayer.stop()
+    chainPlayer = null
+  }
   if (hotkeyManager) {
     hotkeyManager.unregisterAll()
     hotkeyManager = null
   }
+  if (triggerManager) {
+    triggerManager.stop()
+    triggerManager = null
+  }
+  if (profileSwitcher) {
+    profileSwitcher.stop()
+    profileSwitcher = null
+  }
+  destroyActiveWindowService()
 }
 
 export async function getAppSettings(): Promise<AppSettings> {

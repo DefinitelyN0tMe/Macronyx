@@ -23,6 +23,15 @@ export const IPC = {
   MACRO_IMPORT: 'macro:import',
   MACRO_UPDATE: 'macro:update',
 
+  // Macro chains
+  CHAIN_SAVE: 'chain:save',
+  CHAIN_LOAD: 'chain:load',
+  CHAIN_DELETE: 'chain:delete',
+  CHAIN_LIST: 'chain:list',
+  CHAIN_PLAY: 'chain:play',
+  CHAIN_STOP: 'chain:stop',
+  CHAIN_PROGRESS: 'chain:progress',
+
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
 
@@ -30,6 +39,7 @@ export const IPC = {
   PROFILE_SAVE: 'profile:save',
   PROFILE_DELETE: 'profile:delete',
   PROFILE_ACTIVATE: 'profile:activate',
+  PROFILE_ACTIVATED: 'profile:activated',
 
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_MAXIMIZE: 'window:maximize',
@@ -43,7 +53,14 @@ export const IPC = {
   PORTABLE_TOGGLE: 'portable:toggle',
 
   OVERLAY_STATUS: 'overlay:status',
-  OVERLAY_SHOW_MAIN: 'overlay:showMain'
+  OVERLAY_SHOW_MAIN: 'overlay:showMain',
+
+  // Active window & pixel sampling
+  ACTIVE_WINDOW_INFO: 'active-window:info',
+  PIXEL_SAMPLE: 'pixel:sample',
+
+  // Triggers
+  TRIGGER_FIRED: 'trigger:fired'
 } as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -53,14 +70,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
     launchOnStartup: false,
     portableMode: false,
     showOverlayWidget: true,
-    autoSave: true
+    autoSave: true,
+    enableTriggers: false,
+    autoSwitchProfiles: false
   },
   recording: {
     captureMouseMovement: true,
     captureMouseClicks: true,
     captureMouseScroll: true,
     captureKeyboard: true,
-    mouseMoveSampleRate: 16
+    mouseMoveSampleRate: 16,
+    relativePositioning: false
   },
   playback: {
     defaultSpeed: 1.0,
@@ -79,7 +99,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   appearance: {
     accentColor: '#06b6d4'
-  }
+  },
+  profileRules: []
 }
 
 export const DEFAULT_PLAYBACK_SETTINGS = {

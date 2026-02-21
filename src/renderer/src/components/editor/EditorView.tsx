@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { Timeline } from './Timeline'
 import { EventInspector } from './EventInspector'
 import { MousePathPreview } from './MousePathPreview'
+import { TriggerPanel } from './TriggerPanel'
 import '../../styles/timeline.css'
 
 export function EditorView(): JSX.Element {
@@ -16,6 +17,7 @@ export function EditorView(): JSX.Element {
   const renameMacro = useEditorStore((s) => s.renameMacro)
   const updateMacroDescription = useEditorStore((s) => s.updateMacroDescription)
   const smoothDelays = useEditorStore((s) => s.smoothDelays)
+  const insertCondition = useEditorStore((s) => s.insertCondition)
   const zoom = useEditorStore((s) => s.zoom)
   const setZoom = useEditorStore((s) => s.setZoom)
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -33,6 +35,7 @@ export function EditorView(): JSX.Element {
   const [editDesc, setEditDesc] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [showSmoothPopover, setShowSmoothPopover] = useState(false)
+  const [editorTab, setEditorTab] = useState<'timeline' | 'triggers'>('timeline')
   const [smoothWindowSize, setSmoothWindowSize] = useState(5)
   const [smoothMinDelay, setSmoothMinDelay] = useState(10)
   const [smoothMaxDelay, setSmoothMaxDelay] = useState(2000)
@@ -386,6 +389,11 @@ export function EditorView(): JSX.Element {
               </div>
             )}
           </div>
+          <ToolbarBtn
+            label="+ IF"
+            onClick={insertCondition}
+            color="#22c55e"
+          />
           <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px', height: 20 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Zoom</span>
@@ -452,14 +460,54 @@ export function EditorView(): JSX.Element {
         <span>Delete: <kbd style={{ color: 'var(--danger)', fontFamily: 'monospace' }}>Del</kbd></span>
       </div>
 
-      {/* Main content: Timeline + Inspector */}
-      <div style={{ display: 'flex', flex: 1, gap: 12, minHeight: 0 }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-          <Timeline />
-          <MousePathPreview />
-        </div>
-        <EventInspector />
+      {/* Editor tabs */}
+      <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+        <button
+          onClick={() => setEditorTab('timeline')}
+          style={{
+            padding: '6px 14px',
+            borderRadius: '6px 6px 0 0',
+            border: 'none',
+            background: editorTab === 'timeline' ? 'var(--bg-secondary)' : 'transparent',
+            color: editorTab === 'timeline' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600
+          }}
+        >
+          Timeline
+        </button>
+        <button
+          onClick={() => setEditorTab('triggers')}
+          style={{
+            padding: '6px 14px',
+            borderRadius: '6px 6px 0 0',
+            border: 'none',
+            background: editorTab === 'triggers' ? 'var(--bg-secondary)' : 'transparent',
+            color: editorTab === 'triggers' ? '#f59e0b' : 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600
+          }}
+        >
+          Triggers
+        </button>
       </div>
+
+      {/* Main content */}
+      {editorTab === 'timeline' ? (
+        <div style={{ display: 'flex', flex: 1, gap: 12, minHeight: 0 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+            <Timeline />
+            <MousePathPreview />
+          </div>
+          <EventInspector />
+        </div>
+      ) : (
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <TriggerPanel />
+        </div>
+      )}
     </div>
   )
 }

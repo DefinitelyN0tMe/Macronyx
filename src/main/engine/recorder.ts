@@ -1,6 +1,7 @@
 import { uIOhook, UiohookKeyboardEvent, UiohookMouseEvent, UiohookWheelEvent } from 'uiohook-napi'
 import { v4 as uuid } from 'uuid'
 import type { MacroEvent, AppSettings } from '../../shared/types'
+import { getActiveWindowService } from './active-window'
 
 export class Recorder {
   private events: MacroEvent[] = []
@@ -93,6 +94,23 @@ export class Recorder {
   }
 
   private addEvent(event: MacroEvent): void {
+    // Attach relative positioning data if enabled
+    if (this.settings?.relativePositioning && event.x !== undefined && event.y !== undefined) {
+      try {
+        const awService = getActiveWindowService()
+        const current = awService.getCurrent()
+        if (current && current.processName && current.bounds) {
+          event.relativeToWindow = {
+            title: current.title,
+            processName: current.processName,
+            offsetX: event.x - current.bounds.x,
+            offsetY: event.y - current.bounds.y
+          }
+        }
+      } catch {
+        // Relative positioning unavailable — keep absolute coords only
+      }
+    }
     this.events.push(event)
     this.onEvent?.(event)
   }

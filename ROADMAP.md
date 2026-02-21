@@ -37,16 +37,16 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.3 — "Playback Intelligence"
+## v1.3 — "Playback Intelligence" *(released)*
 
-| Feature | Description | Size |
-|---------|-------------|:----:|
-| Trigger-based macros | Start macros based on triggers: schedule (cron/timer), hotkey combos, window focus change, pixel color match | L |
-| Profile auto-switch | Automatically switch settings profiles based on active application/window (detect foreground app) | M |
-| Macro chaining | Run macros sequentially — macro A then B then C | M |
-| Conditional logic | If/else branching in macros (check pixel color, window title, time of day) | L |
-| Relative positioning mode | Record mouse positions relative to active window, not absolute screen coords | M |
-| Playback preview | Visualize playback on MousePathPreview without actually moving the cursor | S |
+| Feature | Description | Size | Status |
+|---------|-------------|:----:|:------:|
+| Trigger-based macros | Start macros based on triggers: schedule (cron/timer), hotkey combos, window focus change, pixel color match | L | Done |
+| Profile auto-switch | Automatically switch settings profiles based on active application/window (detect foreground app) | M | Done |
+| Macro chaining | Run macros sequentially — macro A then B then C | M | Done |
+| Conditional logic | If/else branching in macros (check pixel color, window title, time of day) | L | Done |
+| Relative positioning mode | Record mouse positions relative to active window, not absolute screen coords | M | Done |
+| Playback preview | Visualize playback on MousePathPreview without actually moving the cursor | S | Done |
 
 ---
 

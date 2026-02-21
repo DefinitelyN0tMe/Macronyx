@@ -1,7 +1,9 @@
-import type { Macro, MacroEvent, PlaybackState } from '../../shared/types'
+import type { Macro, MacroEvent, PlaybackState, ConditionConfig } from '../../shared/types'
 import { Humanizer } from './humanizer'
 import { mapKeyCode } from './keymap'
 import { getInputSimulator, destroyInputSimulator } from './input-simulator'
+import { getActiveWindowService } from './active-window'
+import { getPixelSampler } from './pixel-sampler'
 
 export class Player {
   private isPlaying = false
@@ -33,6 +35,10 @@ export class Player {
       for (let repeat = 0; repeat < totalRepeats; repeat++) {
         if (!this.isPlaying) break
 
+        // Condition evaluation state: stack for nested conditionals
+        const skipStack: { skipUntil: 'condition_else' | 'condition_end'; pairId: string }[] = []
+        let skipping = false
+
         for (let i = 0; i < macro.events.length; i++) {
           if (!this.isPlaying) break
 
@@ -42,6 +48,53 @@ export class Player {
           if (!this.isPlaying) break
 
           const event = macro.events[i]
+
+          // ─── Conditional logic evaluation ────────────────────────
+          if (event.type === 'condition_start') {
+            const result = await this.evaluateCondition(event.condition)
+            if (result) {
+              // Condition true: execute true branch, will skip at condition_else
+              skipStack.push({ skipUntil: 'condition_else', pairId: event.conditionPairId || '' })
+              skipping = false
+            } else {
+              // Condition false: skip to condition_else
+              skipStack.push({ skipUntil: 'condition_else', pairId: event.conditionPairId || '' })
+              skipping = true
+            }
+            continue
+          }
+
+          if (event.type === 'condition_else') {
+            const top = skipStack[skipStack.length - 1]
+            if (top && top.pairId === event.conditionPairId) {
+              if (skipping) {
+                // Was skipping (false branch) → now execute else branch
+                skipping = false
+                top.skipUntil = 'condition_end'
+              } else {
+                // Was executing (true branch) → now skip else branch
+                skipping = true
+                top.skipUntil = 'condition_end'
+              }
+            }
+            continue
+          }
+
+          if (event.type === 'condition_end') {
+            const top = skipStack[skipStack.length - 1]
+            if (top && top.pairId === event.conditionPairId) {
+              skipStack.pop()
+              // Restore skipping state from outer scope
+              skipping = skipStack.length > 0 &&
+                skipStack[skipStack.length - 1].skipUntil === 'condition_end'
+            }
+            continue
+          }
+
+          // Skip events if inside a false conditional branch
+          if (skipping) continue
+
+          // ─── Normal event execution ──────────────────────────────
           let delay = event.delay / speed
 
           if (humanize) {
@@ -127,6 +180,37 @@ export class Player {
     destroyInputSimulator()
   }
 
+  /** Resolve relative positioning — compute absolute coords from window-relative offsets */
+  private async resolvePosition(
+    event: MacroEvent
+  ): Promise<{ x: number; y: number }> {
+    let x = event.x ?? 0
+    let y = event.y ?? 0
+
+    if (event.relativeToWindow) {
+      try {
+        const awService = getActiveWindowService()
+        const current = awService.getCurrent()
+        if (current && current.bounds) {
+          // Try to match by process name first
+          if (current.processName === event.relativeToWindow.processName) {
+            x = current.bounds.x + event.relativeToWindow.offsetX
+            y = current.bounds.y + event.relativeToWindow.offsetY
+          } else {
+            // Fallback: use absolute coords
+            console.warn(
+              `Relative positioning: expected ${event.relativeToWindow.processName}, got ${current.processName}. Using absolute coords.`
+            )
+          }
+        }
+      } catch {
+        // Fallback to absolute coords
+      }
+    }
+
+    return { x, y }
+  }
+
   private async executeEvent(
     sim: ReturnType<typeof getInputSimulator>,
     event: MacroEvent,
@@ -136,8 +220,7 @@ export class Player {
     try {
       switch (event.type) {
         case 'mouse_move': {
-          let x = event.x ?? 0
-          let y = event.y ?? 0
+          let { x, y } = await this.resolvePosition(event)
           if (humanize) {
             const offset = this.humanizer.randomizePosition(amount)
             x += offset.x
@@ -147,8 +230,7 @@ export class Player {
           break
         }
         case 'mouse_click': {
-          let x = event.x ?? 0
-          let y = event.y ?? 0
+          let { x, y } = await this.resolvePosition(event)
           if (humanize) {
             const offset = this.humanizer.randomizePosition(amount)
             x += offset.x
@@ -169,7 +251,8 @@ export class Player {
           if (event.scrollDelta) {
             // Move mouse to scroll position first
             if (event.x !== undefined && event.y !== undefined) {
-              await sim.moveMouse(event.x, event.y)
+              const { x, y } = await this.resolvePosition(event)
+              await sim.moveMouse(x, y)
             }
             await sim.mouseScroll(event.scrollDelta.y)
           }
@@ -191,9 +274,70 @@ export class Player {
           }
           break
         }
+        // Condition events are handled in play() loop — not here
+        case 'condition_start':
+        case 'condition_else':
+        case 'condition_end':
+          break
       }
     } catch (err) {
       console.error('Event execution error:', err)
+    }
+  }
+
+  /** Evaluate a condition — returns true if condition is met */
+  private async evaluateCondition(condition?: ConditionConfig): Promise<boolean> {
+    if (!condition) return true
+
+    try {
+      switch (condition.type) {
+        case 'pixel_color': {
+          if (condition.x === undefined || condition.y === undefined || !condition.color) {
+            return false
+          }
+          const sampler = getPixelSampler()
+          return sampler.matchesColor(
+            condition.x,
+            condition.y,
+            condition.color,
+            condition.tolerance ?? 30
+          )
+        }
+        case 'window_title': {
+          if (!condition.matchValue) return false
+          const awService = getActiveWindowService()
+          const current = awService.getCurrent()
+          if (!current) return false
+          const title = current.title
+          switch (condition.matchType) {
+            case 'equals':
+              return title === condition.matchValue
+            case 'regex':
+              return new RegExp(condition.matchValue).test(title)
+            case 'contains':
+            default:
+              return title.toLowerCase().includes(condition.matchValue.toLowerCase())
+          }
+        }
+        case 'time_of_day': {
+          const now = new Date()
+          const currentMinutes = now.getHours() * 60 + now.getMinutes()
+          if (condition.afterTime) {
+            const [h, m] = condition.afterTime.split(':').map(Number)
+            if (currentMinutes < h * 60 + m) return false
+          }
+          if (condition.beforeTime) {
+            const [h, m] = condition.beforeTime.split(':').map(Number)
+            if (currentMinutes > h * 60 + m) return false
+          }
+          return true
+        }
+        default:
+          return true
+      }
+    } catch (err) {
+      console.error('Condition evaluation error:', err)
+      return false
     }
   }
 

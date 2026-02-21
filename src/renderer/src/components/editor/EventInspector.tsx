@@ -212,6 +212,185 @@ export function EventInspector(): JSX.Element {
           </div>
         )}
 
+        {/* Condition config (for condition_start events) */}
+        {selectedEvent.type === 'condition_start' && selectedEvent.condition && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+              Condition Type
+            </div>
+            <select
+              value={selectedEvent.condition.type}
+              onChange={(e) => {
+                const cType = e.target.value as 'pixel_color' | 'window_title' | 'time_of_day'
+                updateEvent(selectedEvent.id, {
+                  condition: { ...selectedEvent.condition!, type: cType }
+                })
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 12
+              }}
+            >
+              <option value="pixel_color">Pixel Color</option>
+              <option value="window_title">Window Title</option>
+              <option value="time_of_day">Time of Day</option>
+            </select>
+
+            {selectedEvent.condition.type === 'pixel_color' && (
+              <>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <InspectorField
+                    label="X"
+                    value={selectedEvent.condition.x ?? 0}
+                    type="number"
+                    onChange={(v) =>
+                      updateEvent(selectedEvent.id, {
+                        condition: { ...selectedEvent.condition!, x: Number(v) }
+                      })
+                    }
+                  />
+                  <InspectorField
+                    label="Y"
+                    value={selectedEvent.condition.y ?? 0}
+                    type="number"
+                    onChange={(v) =>
+                      updateEvent(selectedEvent.id, {
+                        condition: { ...selectedEvent.condition!, y: Number(v) }
+                      })
+                    }
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Color</div>
+                    <input
+                      type="color"
+                      value={selectedEvent.condition.color
+                        ? `#${((1 << 24) + (selectedEvent.condition.color.r << 16) + (selectedEvent.condition.color.g << 8) + selectedEvent.condition.color.b).toString(16).slice(1)}`
+                        : '#ff0000'}
+                      onChange={(e) => {
+                        const hex = e.target.value
+                        const r = parseInt(hex.slice(1, 3), 16)
+                        const g = parseInt(hex.slice(3, 5), 16)
+                        const b = parseInt(hex.slice(5, 7), 16)
+                        updateEvent(selectedEvent.id, {
+                          condition: { ...selectedEvent.condition!, color: { r, g, b } }
+                        })
+                      }}
+                      style={{ width: '100%', height: 28, border: 'none', cursor: 'pointer' }}
+                    />
+                  </div>
+                  <InspectorField
+                    label="Tolerance"
+                    value={selectedEvent.condition.tolerance ?? 30}
+                    type="number"
+                    onChange={(v) =>
+                      updateEvent(selectedEvent.id, {
+                        condition: { ...selectedEvent.condition!, tolerance: Number(v) }
+                      })
+                    }
+                  />
+                </div>
+              </>
+            )}
+
+            {selectedEvent.condition.type === 'window_title' && (
+              <>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Match Type</div>
+                  <select
+                    value={selectedEvent.condition.matchType ?? 'contains'}
+                    onChange={(e) =>
+                      updateEvent(selectedEvent.id, {
+                        condition: {
+                          ...selectedEvent.condition!,
+                          matchType: e.target.value as 'contains' | 'equals' | 'regex'
+                        }
+                      })
+                    }
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      fontSize: 12
+                    }}
+                  >
+                    <option value="contains">Contains</option>
+                    <option value="equals">Equals</option>
+                    <option value="regex">Regex</option>
+                  </select>
+                </div>
+                <InspectorField
+                  label="Match Value"
+                  value={selectedEvent.condition.matchValue ?? ''}
+                  type="text"
+                  onChange={(v) =>
+                    updateEvent(selectedEvent.id, {
+                      condition: { ...selectedEvent.condition!, matchValue: v }
+                    })
+                  }
+                />
+              </>
+            )}
+
+            {selectedEvent.condition.type === 'time_of_day' && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <InspectorField
+                  label="After (HH:mm)"
+                  value={selectedEvent.condition.afterTime ?? ''}
+                  type="text"
+                  onChange={(v) =>
+                    updateEvent(selectedEvent.id, {
+                      condition: { ...selectedEvent.condition!, afterTime: v }
+                    })
+                  }
+                />
+                <InspectorField
+                  label="Before (HH:mm)"
+                  value={selectedEvent.condition.beforeTime ?? ''}
+                  type="text"
+                  onChange={(v) =>
+                    updateEvent(selectedEvent.id, {
+                      condition: { ...selectedEvent.condition!, beforeTime: v }
+                    })
+                  }
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Relative positioning info (read-only display) */}
+        {selectedEvent.relativeToWindow && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+              Relative to Window
+            </div>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+                fontSize: 11,
+                color: 'var(--text-secondary)',
+                lineHeight: 1.5
+              }}
+            >
+              <div><strong>Process:</strong> {selectedEvent.relativeToWindow.processName}</div>
+              <div><strong>Offset:</strong> {selectedEvent.relativeToWindow.offsetX}, {selectedEvent.relativeToWindow.offsetY}</div>
+            </div>
+          </div>
+        )}
+
         {/* Group field for single event */}
         <SingleGroupField
           event={selectedEvent}

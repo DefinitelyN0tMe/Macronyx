@@ -168,6 +168,7 @@ export function Timeline(): JSX.Element {
 
   const mouseEvents = macro.events.filter((e) => e.type.startsWith('mouse_'))
   const keyEvents = macro.events.filter((e) => e.type.startsWith('key_'))
+  const conditionEvents = macro.events.filter((e) => e.type.startsWith('condition_'))
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -247,6 +248,26 @@ export function Timeline(): JSX.Element {
             ))}
           </div>
         </div>
+
+        {/* Conditions Track (only show if conditions exist) */}
+        {conditionEvents.length > 0 && (
+          <div className="timeline-track">
+            <div className="timeline-track-label">Logic</div>
+            <div className="timeline-track-content">
+              {conditionEvents.map((event) => (
+                <TimelineEventChip
+                  key={event.id}
+                  event={event}
+                  zoom={zoom}
+                  scrollOffset={scrollOffset}
+                  isSelected={selectedEventIds.includes(event.id)}
+                  onSelect={handleSelect}
+                  viewportWidth={containerWidth}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </DndContext>
   )
@@ -365,6 +386,57 @@ function TimelineEventChip({
             }}
           >
             {event.keyCode ? getKeyLabel(event.keyCode) : '?'}
+          </div>
+        )
+      case 'condition_start':
+        return (
+          <div
+            style={{
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: '#22c55e33',
+              border: '1px solid #22c55e88',
+              color: '#22c55e',
+              fontSize: 9,
+              fontWeight: 700,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            IF
+          </div>
+        )
+      case 'condition_else':
+        return (
+          <div
+            style={{
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: '#f59e0b33',
+              border: '1px solid #f59e0b88',
+              color: '#f59e0b',
+              fontSize: 9,
+              fontWeight: 700,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            ELSE
+          </div>
+        )
+      case 'condition_end':
+        return (
+          <div
+            style={{
+              padding: '1px 6px',
+              borderRadius: 4,
+              background: '#6b728033',
+              border: '1px solid #6b728088',
+              color: '#9ca3af',
+              fontSize: 9,
+              fontWeight: 700,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            END
           </div>
         )
       default:

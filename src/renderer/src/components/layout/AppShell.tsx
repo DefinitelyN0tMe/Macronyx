@@ -8,6 +8,7 @@ import { DashboardView } from '../dashboard/DashboardView'
 import { RecorderView } from '../recorder/RecorderView'
 import { EditorView } from '../editor/EditorView'
 import { LibraryView } from '../library/LibraryView'
+import { ChainEditor } from '../chains/ChainEditor'
 import { SettingsView } from '../settings/SettingsView'
 import { useAppStore } from '../../stores/appStore'
 import { useEditorStore } from '../../stores/editorStore'
@@ -198,6 +199,7 @@ export function AppShell(): JSX.Element {
           {activeView === 'recorder' && <RecorderView />}
           {activeView === 'editor' && <EditorView />}
           {activeView === 'library' && <LibraryView />}
+          {activeView === 'chains' && <ChainEditor />}
           {activeView === 'settings' && <SettingsView />}
         </main>
       </div>
