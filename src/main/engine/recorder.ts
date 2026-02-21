@@ -68,13 +68,16 @@ export class Recorder {
 
   resume(): void {
     if (!this.isRecording || !this.isPaused) return
-    this.pausedDuration += Date.now() - this.pauseStartTime
+    const pauseLen = Date.now() - this.pauseStartTime
+    this.pausedDuration += pauseLen
     this.isPaused = false
     // Cooldown period — suppress any events that arrive within 200ms of resume
     // (these are key releases from the resume hotkey, not real user input)
     this.resumeCooldownUntil = Date.now() + 200
-    // Reset lastEventTime so delay after resume is measured from resume moment
-    this.lastEventTime = Date.now()
+    // Shift lastEventTime forward by the pause length so the delay for the first
+    // event after resume = (pre-pause gap) + (post-resume gap), excluding pause time.
+    // Without this, the delay would include the entire pause duration.
+    this.lastEventTime += pauseLen
   }
 
   /** Get current accumulated pause duration (for external elapsed calculations) */

@@ -8,6 +8,8 @@ export class Player {
   private isPaused = false
   private onProgress?: (state: PlaybackState) => void
   private humanizer = new Humanizer()
+  private heldKeys = new Set<string>()
+  private activeSim: ReturnType<typeof getInputSimulator> | null = null
 
   async play(macro: Macro, onProgress: (state: PlaybackState) => void): Promise<void> {
     // Guard against concurrent plays
@@ -24,6 +26,8 @@ export class Player {
 
     // Get the input simulator (singleton, stays alive between plays)
     const sim = getInputSimulator()
+    this.activeSim = sim
+    this.heldKeys.clear()
 
     try {
       for (let repeat = 0; repeat < totalRepeats; repeat++) {
@@ -78,6 +82,10 @@ export class Player {
     }
 
     this.isPlaying = false
+    // Release any remaining held keys at end of playback
+    this.releaseAllHeldKeys()
+    this.heldKeys.clear()
+    this.activeSim = null
     onProgress({
       macroId: macro.id,
       status: 'idle',
@@ -91,13 +99,19 @@ export class Player {
   stop(): void {
     this.isPlaying = false
     this.isPaused = false
+    // Release any keys still held to prevent stuck keys
+    this.releaseAllHeldKeys()
   }
 
   pause(): void {
     this.isPaused = true
+    // Release all currently held keys to prevent stuck modifiers
+    this.releaseAllHeldKeys()
   }
 
   resume(): void {
+    // Restore all keys that were held before pause
+    this.restoreHeldKeys()
     this.isPaused = false
   }
 
@@ -157,17 +171,48 @@ export class Player {
         }
         case 'key_down': {
           const key = mapKeyCode(event.keyCode ?? 0)
-          if (key) await sim.keyDown(key)
+          if (key) {
+            this.heldKeys.add(key)
+            await sim.keyDown(key)
+          }
           break
         }
         case 'key_up': {
           const key = mapKeyCode(event.keyCode ?? 0)
-          if (key) await sim.keyUp(key)
+          if (key) {
+            this.heldKeys.delete(key)
+            await sim.keyUp(key)
+          }
           break
         }
       }
     } catch (err) {
       console.error('Event execution error:', err)
+    }
+  }
+
+  /** Release all currently held keys to prevent stuck modifiers during pause/stop */
+  private releaseAllHeldKeys(): void {
+    if (!this.activeSim || this.heldKeys.size === 0) return
+    for (const key of this.heldKeys) {
+      try {
+        this.activeSim.keyUp(key)
+      } catch {
+        // Best effort
+      }
+    }
+    // Don't clear heldKeys — we need them for restore on resume
+  }
+
+  /** Re-press all keys that were held before pause */
+  private restoreHeldKeys(): void {
+    if (!this.activeSim || this.heldKeys.size === 0) return
+    for (const key of this.heldKeys) {
+      try {
+        this.activeSim.keyDown(key)
+      } catch {
+        // Best effort
+      }
     }
   }
 

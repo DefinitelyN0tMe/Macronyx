@@ -36,6 +36,9 @@ export function createOverlayWindow(): void {
     }
   })
 
+  // Force highest z-level so overlay shows above fullscreen apps and games
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver')
+
   // Allow mouse events on the overlay (not click-through)
   overlayWindow.setIgnoreMouseEvents(false)
 

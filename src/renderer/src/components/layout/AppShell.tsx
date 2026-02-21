@@ -14,6 +14,14 @@ import { useEditorStore } from '../../stores/editorStore'
 import { useMacroStore } from '../../stores/macroStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import type { AppStatus, Macro } from '@shared/types'
+import {
+  soundRecordStart,
+  soundRecordStop,
+  soundPause,
+  soundResume,
+  soundPlayStart,
+  soundPlayStop
+} from '../../utils/sounds'
 
 export function AppShell(): JSX.Element {
   const activeView = useAppStore((s) => s.activeView)
@@ -37,15 +45,27 @@ export function AppShell(): JSX.Element {
       const store = useAppStore.getState()
       const prev = store.status
 
-      // Recording timer state transitions
+      // Recording timer state transitions + notification sounds
       if (newStatus === 'recording' && (prev === 'idle' || prev === 'playing' || prev === 'paused')) {
         store.startRecordingTimer()
+        soundRecordStart()
       } else if (newStatus === 'recording' && prev === 'recording_paused') {
         store.resumeRecordingTimer()
+        soundResume()
       } else if (newStatus === 'recording_paused' && prev === 'recording') {
         store.pauseRecordingTimer()
+        soundPause()
       } else if (newStatus === 'idle' && (prev === 'recording' || prev === 'recording_paused')) {
         store.resetRecordingTimer()
+        soundRecordStop()
+      } else if (newStatus === 'playing' && prev === 'idle') {
+        soundPlayStart()
+      } else if (newStatus === 'playing' && prev === 'paused') {
+        soundResume()
+      } else if (newStatus === 'paused' && prev === 'playing') {
+        soundPause()
+      } else if (newStatus === 'idle' && (prev === 'playing' || prev === 'paused')) {
+        soundPlayStop()
       }
 
       store.setStatus(newStatus)
