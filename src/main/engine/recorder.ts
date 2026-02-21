@@ -11,6 +11,7 @@ export class Recorder {
   private pausedDuration = 0
   private pauseStartTime = 0
   private lastMouseMoveTime = 0
+  private resumeCooldownUntil = 0
   private onEvent?: (event: MacroEvent) => void
   private settings: AppSettings['recording'] | null = null
 
@@ -23,6 +24,7 @@ export class Recorder {
     this.isPaused = false
     this.pausedDuration = 0
     this.pauseStartTime = 0
+    this.resumeCooldownUntil = 0
     this.onEvent = onEvent
     this.settings = settings
 
@@ -48,6 +50,7 @@ export class Recorder {
   stop(): MacroEvent[] {
     this.isRecording = false
     this.isPaused = false
+    this.resumeCooldownUntil = 0
     try {
       uIOhook.stop()
     } catch {
@@ -67,8 +70,23 @@ export class Recorder {
     if (!this.isRecording || !this.isPaused) return
     this.pausedDuration += Date.now() - this.pauseStartTime
     this.isPaused = false
+    // Cooldown period — suppress any events that arrive within 200ms of resume
+    // (these are key releases from the resume hotkey, not real user input)
+    this.resumeCooldownUntil = Date.now() + 200
     // Reset lastEventTime so delay after resume is measured from resume moment
     this.lastEventTime = Date.now()
+  }
+
+  /** Get current accumulated pause duration (for external elapsed calculations) */
+  getPausedDuration(): number {
+    if (this.isPaused && this.pauseStartTime > 0) {
+      return this.pausedDuration + (Date.now() - this.pauseStartTime)
+    }
+    return this.pausedDuration
+  }
+
+  private isInCooldown(): boolean {
+    return this.resumeCooldownUntil > 0 && Date.now() < this.resumeCooldownUntil
   }
 
   private addEvent(event: MacroEvent): void {
@@ -85,7 +103,7 @@ export class Recorder {
   }
 
   private handleKeyDown = (e: UiohookKeyboardEvent): void => {
-    if (!this.isRecording || this.isPaused) return
+    if (!this.isRecording || this.isPaused || this.isInCooldown()) return
     const { timestamp, delay } = this.getTimings()
     this.addEvent({
       id: uuid(),
@@ -98,7 +116,7 @@ export class Recorder {
   }
 
   private handleKeyUp = (e: UiohookKeyboardEvent): void => {
-    if (!this.isRecording || this.isPaused) return
+    if (!this.isRecording || this.isPaused || this.isInCooldown()) return
     const { timestamp, delay } = this.getTimings()
     this.addEvent({
       id: uuid(),
@@ -111,7 +129,7 @@ export class Recorder {
   }
 
   private handleMouseClick = (e: UiohookMouseEvent): void => {
-    if (!this.isRecording || this.isPaused) return
+    if (!this.isRecording || this.isPaused || this.isInCooldown()) return
     const { timestamp, delay } = this.getTimings()
     const button = e.button === 1 ? 'left' : e.button === 2 ? 'right' : 'middle'
     this.addEvent({
@@ -127,7 +145,7 @@ export class Recorder {
   }
 
   private handleMouseMove = (e: UiohookMouseEvent): void => {
-    if (!this.isRecording || this.isPaused) return
+    if (!this.isRecording || this.isPaused || this.isInCooldown()) return
     const now = Date.now()
     const sampleRate = this.settings?.mouseMoveSampleRate ?? 16
     if (now - this.lastMouseMoveTime < sampleRate) return
@@ -144,7 +162,7 @@ export class Recorder {
   }
 
   private handleWheel = (e: UiohookWheelEvent): void => {
-    if (!this.isRecording || this.isPaused) return
+    if (!this.isRecording || this.isPaused || this.isInCooldown()) return
     const { timestamp, delay } = this.getTimings()
     // uiohook: rotation > 0 = scroll down, direction 3 = vertical
     // Store raw rotation with direction sign for playback

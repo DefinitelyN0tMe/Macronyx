@@ -29,11 +29,26 @@ export function AppShell(): JSX.Element {
     loadSettings()
   }, [loadMacros, loadSettings])
 
-  // Listen for app status changes from the main process
+  // Listen for app status changes — drives recording timer state management
+  // This runs in AppShell (always mounted) so it works for both button and hotkey paths
   useEffect(() => {
     const unsub = window.api.onAppStatus((raw) => {
       const newStatus = raw as AppStatus
-      useAppStore.getState().setStatus(newStatus)
+      const store = useAppStore.getState()
+      const prev = store.status
+
+      // Recording timer state transitions
+      if (newStatus === 'recording' && (prev === 'idle' || prev === 'playing' || prev === 'paused')) {
+        store.startRecordingTimer()
+      } else if (newStatus === 'recording' && prev === 'recording_paused') {
+        store.resumeRecordingTimer()
+      } else if (newStatus === 'recording_paused' && prev === 'recording') {
+        store.pauseRecordingTimer()
+      } else if (newStatus === 'idle' && (prev === 'recording' || prev === 'recording_paused')) {
+        store.resetRecordingTimer()
+      }
+
+      store.setStatus(newStatus)
     })
     return unsub
   }, [])

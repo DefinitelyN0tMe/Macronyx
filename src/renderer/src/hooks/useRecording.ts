@@ -8,8 +8,8 @@ export function useRecording() {
   const recordingStartedAt = useAppStore((s) => s.recordingStartedAt)
   const recordingAccumulatedPause = useAppStore((s) => s.recordingAccumulatedPause)
   const recordingPausedAt = useAppStore((s) => s.recordingPausedAt)
+  const recordingEventCount = useAppStore((s) => s.recordingEventCount)
   const { loadMacros } = useMacroStore()
-  const [eventCount, setEventCount] = useState(0)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [lastMacro, setLastMacro] = useState<Macro | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -17,37 +17,37 @@ export function useRecording() {
   const isRecording = status === 'recording' || status === 'recording_paused'
   const isPaused = status === 'recording_paused'
 
+  // Count recording events (persisted in appStore so it survives navigation)
   useEffect(() => {
     const unsub = window.api.onRecordingEvent(() => {
-      setEventCount((c) => c + 1)
+      useAppStore.getState().incrementEventCount()
     })
     return unsub
   }, [])
 
+  // Sync event count from RECORDING_STATUS messages (authoritative from main process)
   useEffect(() => {
     const unsub = window.api.onRecordingStatus((raw) => {
       const state = raw as RecordingState
-      if (state.isRecording && !state.isPaused) {
-        useAppStore.getState().setStatus('recording')
-      } else if (state.isRecording && state.isPaused) {
-        useAppStore.getState().setStatus('recording_paused')
-      }
+      useAppStore.getState().setEventCount(state.eventCount)
     })
     return unsub
   }, [])
 
-  // Timer management — uses appStore values (survive navigation)
+  // Timer display — reads from appStore values (survive navigation)
+  // Timer state management is done in AppShell.tsx (always mounted) so hotkeys work too
   useEffect(() => {
     if (status === 'recording') {
       if (timerRef.current) clearInterval(timerRef.current)
       timerRef.current = setInterval(() => {
-        const { recordingStartedAt: start, recordingAccumulatedPause: pause } = useAppStore.getState()
+        const { recordingStartedAt: start, recordingAccumulatedPause: pause } =
+          useAppStore.getState()
         if (start > 0) {
           setElapsedMs(Date.now() - start - pause)
         }
       }, 50)
     } else if (status === 'recording_paused') {
-      // Freeze the timer — compute frozen value from store
+      // Freeze the timer at the paused value
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
@@ -66,10 +66,17 @@ export function useRecording() {
     }
   }, [status, recordingStartedAt, recordingPausedAt, recordingAccumulatedPause])
 
+  // On mount while recording: immediately show the correct elapsed time
+  useEffect(() => {
+    if (status === 'recording' && recordingStartedAt > 0) {
+      setElapsedMs(Date.now() - recordingStartedAt - recordingAccumulatedPause)
+    } else if (status === 'recording_paused' && recordingStartedAt > 0 && recordingPausedAt > 0) {
+      setElapsedMs(recordingPausedAt - recordingStartedAt - recordingAccumulatedPause)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const startRecording = useCallback(async () => {
-    setEventCount(0)
-    setElapsedMs(0)
-    useAppStore.getState().startRecordingTimer()
     await window.api.startRecording()
   }, [])
 
@@ -78,7 +85,6 @@ export function useRecording() {
       success: boolean
       macro?: Macro
     }
-    useAppStore.getState().resetRecordingTimer()
     if (result.success && result.macro) {
       setLastMacro(result.macro)
       await loadMacros()
@@ -86,19 +92,17 @@ export function useRecording() {
   }, [loadMacros])
 
   const pauseRecording = useCallback(async () => {
-    useAppStore.getState().pauseRecordingTimer()
     await window.api.pauseRecording()
   }, [])
 
   const resumeRecording = useCallback(async () => {
-    useAppStore.getState().resumeRecordingTimer()
     await window.api.resumeRecording()
   }, [])
 
   return {
     isRecording,
     isPaused,
-    eventCount,
+    eventCount: recordingEventCount,
     elapsedMs,
     lastMacro,
     startRecording,

@@ -72,7 +72,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hotkeys: {
     recordStart: 'F9',
     recordStop: 'F10',
-    togglePause: 'F12',
+    togglePause: 'Shift+F9',
     playStart: 'F11',
     playStop: 'Shift+F11',
     emergencyStop: 'Escape'

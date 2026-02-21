@@ -21,6 +21,49 @@ let settingsStorage: SettingsStorage | null = null
 let profileStorage: ProfileStorage | null = null
 let currentRecordingEvents: MacroEvent[] = []
 let recordingStartTime = 0
+let recordingPausedAt = 0
+let recordingAccumulatedPause = 0
+
+/** Compute the correct recording elapsed time (excluding pauses) */
+function getRecordingElapsed(): number {
+  if (recordingStartTime === 0) return 0
+  const now = Date.now()
+  if (recordingPausedAt > 0) {
+    // Currently paused — elapsed up to the moment of pause
+    return recordingPausedAt - recordingStartTime - recordingAccumulatedPause
+  }
+  return now - recordingStartTime - recordingAccumulatedPause
+}
+
+/** Remove orphaned key_down events at the tail of the recording (from pause hotkey) */
+function cleanupOrphanedKeyDowns(): void {
+  // Build count of held keys (more downs than ups)
+  const downCount = new Map<number, number>()
+  for (const event of currentRecordingEvents) {
+    if (event.type === 'key_down' && event.keyCode !== undefined) {
+      downCount.set(event.keyCode, (downCount.get(event.keyCode) || 0) + 1)
+    } else if (event.type === 'key_up' && event.keyCode !== undefined) {
+      const count = downCount.get(event.keyCode) || 0
+      if (count > 0) downCount.set(event.keyCode, count - 1)
+    }
+  }
+
+  const heldKeys = new Set<number>()
+  for (const [keyCode, count] of downCount) {
+    if (count > 0) heldKeys.add(keyCode)
+  }
+
+  if (heldKeys.size === 0) return
+
+  // Remove trailing key_down events for held keys (walking backwards)
+  for (let i = currentRecordingEvents.length - 1; i >= 0 && heldKeys.size > 0; i--) {
+    const ev = currentRecordingEvents[i]
+    if (ev.type === 'key_down' && ev.keyCode !== undefined && heldKeys.has(ev.keyCode)) {
+      currentRecordingEvents.splice(i, 1)
+      heldKeys.delete(ev.keyCode)
+    }
+  }
+}
 
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   macroStorage = new MacroStorage()
@@ -49,6 +92,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const settings = await settingsStorage!.get()
       currentRecordingEvents = []
       recordingStartTime = Date.now()
+      recordingPausedAt = 0
+      recordingAccumulatedPause = 0
 
       recorder!.start(settings.recording, (event: MacroEvent) => {
         currentRecordingEvents.push(event)
@@ -71,7 +116,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC.RECORDING_STOP, async () => {
     try {
+      // If stopped while paused, clean up orphaned keys first
+      if (recordingPausedAt > 0) {
+        cleanupOrphanedKeyDowns()
+      }
       recorder!.stop()
+      recordingPausedAt = 0
+      recordingAccumulatedPause = 0
       const events = [...currentRecordingEvents]
       const duration = events.length > 0 ? events[events.length - 1].timestamp : 0
       // Use user's default playback settings from saved settings
@@ -114,13 +165,19 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.RECORDING_PAUSE, async () => {
     try {
       recorder!.pause()
+      recordingPausedAt = Date.now()
+
+      // Remove orphaned key_down events from the pause hotkey (e.g. Shift held)
+      cleanupOrphanedKeyDowns()
+
+      const elapsed = getRecordingElapsed()
       mainWindow.webContents.send(IPC.APP_STATUS, 'recording_paused')
-      updateOverlayStatus('paused')
+      updateOverlayStatus('paused', elapsed)
       mainWindow.webContents.send(IPC.RECORDING_STATUS, {
         isRecording: true,
         isPaused: true,
         eventCount: currentRecordingEvents.length,
-        elapsedMs: Date.now() - recordingStartTime,
+        elapsedMs: elapsed,
         startTime: recordingStartTime
       })
       return { success: true }
@@ -132,13 +189,19 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.RECORDING_RESUME, async () => {
     try {
       recorder!.resume()
+      if (recordingPausedAt > 0) {
+        recordingAccumulatedPause += Date.now() - recordingPausedAt
+        recordingPausedAt = 0
+      }
+
+      const elapsed = getRecordingElapsed()
       mainWindow.webContents.send(IPC.APP_STATUS, 'recording')
-      updateOverlayStatus('recording')
+      updateOverlayStatus('recording', elapsed)
       mainWindow.webContents.send(IPC.RECORDING_STATUS, {
         isRecording: true,
         isPaused: false,
         eventCount: currentRecordingEvents.length,
-        elapsedMs: Date.now() - recordingStartTime,
+        elapsedMs: elapsed,
         startTime: recordingStartTime
       })
       return { success: true }
