@@ -11,7 +11,7 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 [![GitHub downloads](https://img.shields.io/github/downloads/DefinitelyN0tMe/Macronyx/total)](https://github.com/DefinitelyN0tMe/Macronyx/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/DefinitelyN0tMe/Macronyx/build.yml?branch=main)](https://github.com/DefinitelyN0tMe/Macronyx/actions)
 
-[Download](#download) | [Features](#features) | [Usage](#usage) | [Build](#build-from-source) | [Contributing](#contributing)
+[Download](#download) | [Features](#features) | [Usage](#usage) | [Build](#build-from-source) | [Roadmap](ROADMAP.md) | [Contributing](#contributing)
 
 </div>
 
@@ -63,11 +63,15 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
   |--------|---------------|
   | Start recording | `F9` |
   | Stop recording | `F10` |
+  | Pause / Resume | `Shift+F9` |
   | Start playback | `F11` |
   | Stop playback | `Shift+F11` |
   | Emergency stop | `Escape` |
+- **Floating overlay widget** — always-on-top status indicator showing recording/playback state, elapsed time, and total duration (shows above fullscreen apps)
+- **Notification sounds** — audio feedback for record, stop, pause, resume, and playback actions
 - System tray — minimize to tray and control via hotkeys
 - All hotkeys are fully customizable in Settings
+- **Multi-monitor support** — correct cursor positioning across all displays
 
 ### Cross-Platform
 | Platform | Installer | Portable / Standalone |
@@ -189,6 +193,7 @@ npm run build:linux  # Package for Linux
 ### Windows
 - No special permissions required
 - Works with any DPI scaling (100%-300%+)
+- Multi-monitor support with virtual screen coordinate mapping
 - Input simulation uses Win32 `SendInput` API for reliable, DPI-aware playback
 
 ### macOS
@@ -199,6 +204,12 @@ npm run build:linux  # Package for Linux
 - Requires X11 (`libx11-dev`, `libxtst-dev`)
 - On Wayland, the X11 compatibility layer (XWayland) may be needed
 - AppImage: run `chmod +x Macronyx-*.AppImage` before launching
+
+---
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned features and the development timeline.
 
 ---
 

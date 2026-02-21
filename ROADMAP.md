@@ -6,7 +6,7 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.1 — "Polish & Support"
+## v1.1 — "Polish & Support" *(released)*
 
 | Feature | Description | Size | Status |
 |---------|-------------|:----:|:------:|
@@ -18,7 +18,7 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.2 — "Editor Power-Up" *(current)*
+## v1.2 — "Editor Power-Up" *(released)*
 
 | Feature | Description | Size | Status |
 |---------|-------------|:----:|:------:|
@@ -29,6 +29,11 @@ A living document outlining planned features, improvements, and long-term vision
 | Event grouping | Group related events into named "actions" with colored timeline bands | M | Done |
 | Auto-save + dirty flag | Warn on unsaved changes, periodic auto-save, navigation guard | S | Done |
 | Smart delay smoothing | Moving-average smoothing with configurable window size and min/max clamp | M | Done |
+| Notification sounds | Audio feedback for record/stop/pause/resume/play (Web Audio synthesis) | S | Done |
+| Multi-monitor support | Correct coordinate mapping across all displays (virtual screen metrics) | M | Done |
+| Atomic click accuracy | Single-batch SendInput for move+click to guarantee correct position | S | Done |
+| Overlay playback info | Widget shows elapsed / total duration, works above fullscreen apps | S | Done |
+| Hotkey hints | All pages show relevant hotkey badges and editing shortcuts | S | Done |
 
 ---
 
@@ -66,7 +71,7 @@ A living document outlining planned features, improvements, and long-term vision
 | Plugin system | Allow community extensions (custom event types, triggers, actions) | XL |
 | Cloud sync | Sync macros and settings across machines (optional, via GitHub Gist or custom backend) | L |
 | Advanced humanizer | ML-based humanization with natural mouse curves, realistic typing patterns, micro-pauses | L |
-| Multi-monitor support | Record and play across multiple displays with monitor-aware positioning | M |
+| Multi-monitor enhancements | Per-monitor DPI awareness, monitor-relative recording mode, display layout changes | M |
 | Macro variables | Define variables (click_x, delay_ms) that can be changed per-run without editing the macro | M |
 
 ---
