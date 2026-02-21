@@ -253,7 +253,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC.PLAYBACK_STOP, async () => {
     playbackPaused = false
-    player!.stop()
+    player!.stop() // also releases any held keys
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
     return { success: true }
@@ -455,8 +455,18 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
     mainWindow.webContents.send('hotkey:action', 'playStop')
   })
   hotkeyManager.setCallback('emergencyStop', () => {
-    recorder?.stop()
-    player?.stop()
+    // Stop all recording/playback and reset all state
+    playbackPaused = false
+    recordingPausedAt = 0
+    recordingAccumulatedPause = 0
+    if (recorder) {
+      try { recorder.stop() } catch { /* may already be stopped */ }
+    }
+    if (player) {
+      // player.stop() also releases held keys via releaseAllHeldKeys()
+      player.stop()
+    }
+    currentRecordingEvents = []
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
     if (!mainWindow.isVisible()) {

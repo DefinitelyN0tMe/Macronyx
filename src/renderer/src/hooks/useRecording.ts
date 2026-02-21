@@ -25,11 +25,22 @@ export function useRecording() {
     return unsub
   }, [])
 
-  // Sync event count from RECORDING_STATUS messages (authoritative from main process)
+  // Sync event count AND timer from RECORDING_STATUS messages (authoritative from main process)
   useEffect(() => {
     const unsub = window.api.onRecordingStatus((raw) => {
       const state = raw as RecordingState
-      useAppStore.getState().setEventCount(state.eventCount)
+      const store = useAppStore.getState()
+      store.setEventCount(state.eventCount)
+
+      // Sync timer to the main process's authoritative elapsed time
+      // This eliminates drift from independent Date.now() tracking across processes
+      if (state.elapsedMs !== undefined && state.elapsedMs >= 0) {
+        if (state.isPaused) {
+          store.syncRecordingElapsed(state.elapsedMs, true)
+        } else if (state.isRecording) {
+          store.syncRecordingElapsed(state.elapsedMs, false)
+        }
+      }
     })
     return unsub
   }, [])

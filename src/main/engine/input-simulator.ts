@@ -7,6 +7,8 @@ import { spawn, ChildProcess, execSync } from 'child_process'
 
 interface InputSimulator {
   moveMouse(x: number, y: number): Promise<void>
+  /** Atomically move cursor to (x,y) and click — guarantees click at correct position */
+  moveAndClick(x: number, y: number, button: 'left' | 'right' | 'middle'): Promise<void>
   mouseDown(button: 'left' | 'right' | 'middle'): Promise<void>
   mouseUp(button: 'left' | 'right' | 'middle'): Promise<void>
   mouseClick(button: 'left' | 'right' | 'middle'): Promise<void>
@@ -86,30 +88,66 @@ public class NativeInput {
     public static extern int MapVirtualKey(int uCode, int uMapType);
 
     private static bool dpiAware = false;
-    private static int screenW = 0;
-    private static int screenH = 0;
+    private static int virtualX = 0;
+    private static int virtualY = 0;
+    private static int virtualW = 0;
+    private static int virtualH = 0;
 
     public static void EnsureDPIAware() {
         if (!dpiAware) {
             SetProcessDPIAware();
             dpiAware = true;
-            screenW = GetSystemMetrics(0); // SM_CXSCREEN
-            screenH = GetSystemMetrics(1); // SM_CYSCREEN
+            // Use virtual screen metrics for multi-monitor support
+            // SM_XVIRTUALSCREEN (76) / SM_YVIRTUALSCREEN (77) = top-left origin (can be negative)
+            // SM_CXVIRTUALSCREEN (78) / SM_CYVIRTUALSCREEN (79) = total virtual screen size
+            virtualX = GetSystemMetrics(76);
+            virtualY = GetSystemMetrics(77);
+            virtualW = GetSystemMetrics(78);
+            virtualH = GetSystemMetrics(79);
+            // Fallback to primary monitor if virtual screen metrics are zero
+            if (virtualW == 0 || virtualH == 0) {
+                virtualX = 0;
+                virtualY = 0;
+                virtualW = GetSystemMetrics(0); // SM_CXSCREEN
+                virtualH = GetSystemMetrics(1); // SM_CYSCREEN
+            }
         }
     }
 
     public static void MoveMouse(int x, int y) {
         EnsureDPIAware();
-        // Use SendInput with ABSOLUTE coordinates (0-65535 normalized)
-        // This bypasses DPI scaling issues entirely
-        int normX = (int)((x * 65536L) / screenW);
-        int normY = (int)((y * 65536L) / screenH);
+        // Map coordinates to 0-65535 range across the virtual screen (all monitors)
+        // MOUSEEVENTF_VIRTUALDESK (0x4000) ensures mapping covers all monitors
+        int normX = (int)(((long)(x - virtualX) * 65536L) / virtualW);
+        int normY = (int)(((long)(y - virtualY) * 65536L) / virtualH);
         INPUT[] input = new INPUT[1];
         input[0].type = 0; // INPUT_MOUSE
         input[0].data.mi.dx = normX;
         input[0].data.mi.dy = normY;
-        input[0].data.mi.dwFlags = 0x0001 | 0x8000; // MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE
+        input[0].data.mi.dwFlags = 0x0001 | 0x8000 | 0x4000; // MOVE | ABSOLUTE | VIRTUALDESK
         SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    // Atomic move + click: sends move and click as a single SendInput batch
+    // This guarantees the click happens exactly at the target position
+    public static void MoveAndClick(int x, int y, int downFlags, int upFlags) {
+        EnsureDPIAware();
+        int normX = (int)(((long)(x - virtualX) * 65536L) / virtualW);
+        int normY = (int)(((long)(y - virtualY) * 65536L) / virtualH);
+        // Batch: move, then click-down, then click-up — all in one SendInput call
+        INPUT[] input = new INPUT[3];
+        // Move
+        input[0].type = 0;
+        input[0].data.mi.dx = normX;
+        input[0].data.mi.dy = normY;
+        input[0].data.mi.dwFlags = 0x0001 | 0x8000 | 0x4000;
+        // Mouse down
+        input[1].type = 0;
+        input[1].data.mi.dwFlags = downFlags;
+        // Mouse up
+        input[2].type = 0;
+        input[2].data.mi.dwFlags = upFlags;
+        SendInput(3, input, Marshal.SizeOf(typeof(INPUT)));
     }
 
     public static void MouseEvent(int flags, int data) {
@@ -206,6 +244,15 @@ Write-Output "READY"
     await this.sendCommand(`[NativeInput]::MouseEvent(${flags}, 0)`)
   }
 
+  async moveAndClick(x: number, y: number, button: 'left' | 'right' | 'middle'): Promise<void> {
+    const downFlags = button === 'right' ? 0x0008 : button === 'middle' ? 0x0020 : 0x0002
+    const upFlags = button === 'right' ? 0x0010 : button === 'middle' ? 0x0040 : 0x0004
+    // Atomic move+click via single SendInput batch — guarantees click at correct position
+    this.sendFireAndForget(`[NativeInput]::MoveAndClick(${Math.round(x)}, ${Math.round(y)}, ${downFlags}, ${upFlags})`)
+    // Small delay to let the click complete
+    await new Promise(r => setTimeout(r, 25))
+  }
+
   async mouseClick(button: 'left' | 'right' | 'middle'): Promise<void> {
     const downFlags = button === 'right' ? 0x0008 : button === 'middle' ? 0x0020 : 0x0002
     const upFlags = button === 'right' ? 0x0010 : button === 'middle' ? 0x0040 : 0x0004
@@ -254,6 +301,11 @@ Write-Output "READY"
 class LinuxSimulator implements InputSimulator {
   async moveMouse(x: number, y: number): Promise<void> {
     execSync(`xdotool mousemove --sync ${Math.round(x)} ${Math.round(y)}`, { timeout: 1000 })
+  }
+
+  async moveAndClick(x: number, y: number, button: 'left' | 'right' | 'middle'): Promise<void> {
+    const btn = button === 'right' ? '3' : button === 'middle' ? '2' : '1'
+    execSync(`xdotool mousemove --sync ${Math.round(x)} ${Math.round(y)} click ${btn}`, { timeout: 1000 })
   }
 
   async mouseDown(button: 'left' | 'right' | 'middle'): Promise<void> {
@@ -305,6 +357,16 @@ class MacOSSimulator implements InputSimulator {
       this.hasClic = true
     } catch {
       this.hasClic = false
+    }
+  }
+
+  async moveAndClick(x: number, y: number, button: 'left' | 'right' | 'middle'): Promise<void> {
+    if (this.hasClic) {
+      const cmd = button === 'right' ? 'rc' : 'c'
+      execSync(`cliclick ${cmd}:${Math.round(x)},${Math.round(y)}`, { timeout: 1000 })
+    } else {
+      await this.moveMouse(x, y)
+      await this.mouseClick(button)
     }
   }
 

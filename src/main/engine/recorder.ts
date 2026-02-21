@@ -71,9 +71,9 @@ export class Recorder {
     const pauseLen = Date.now() - this.pauseStartTime
     this.pausedDuration += pauseLen
     this.isPaused = false
-    // Cooldown period — suppress any events that arrive within 200ms of resume
+    // Cooldown period — suppress any events that arrive within 120ms of resume
     // (these are key releases from the resume hotkey, not real user input)
-    this.resumeCooldownUntil = Date.now() + 200
+    this.resumeCooldownUntil = Date.now() + 120
     // Shift lastEventTime forward by the pause length so the delay for the first
     // event after resume = (pre-pause gap) + (post-resume gap), excluding pause time.
     // Without this, the delay would include the entire pause duration.

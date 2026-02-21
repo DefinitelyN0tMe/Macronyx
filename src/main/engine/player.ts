@@ -55,6 +55,12 @@ export class Player {
               while (performance.now() - start < delay) {
                 // Busy wait for sub-5ms precision
               }
+            } else if (delay > 100) {
+              // For long delays, sleep in chunks so pause/stop is responsive
+              const deadline = Date.now() + delay
+              while (Date.now() < deadline && this.isPlaying && !this.isPaused) {
+                await this.sleep(Math.min(50, deadline - Date.now()))
+              }
             } else {
               await this.sleep(delay)
             }
@@ -148,8 +154,8 @@ export class Player {
             x += offset.x
             y += offset.y
           }
-          await sim.moveMouse(x, y)
-          await sim.mouseClick((event.button as 'left' | 'right' | 'middle') ?? 'left')
+          // Atomic move+click — guarantees click at the correct position
+          await sim.moveAndClick(x, y, (event.button as 'left' | 'right' | 'middle') ?? 'left')
           break
         }
         case 'mouse_up': {
