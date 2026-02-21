@@ -23,6 +23,7 @@ let currentRecordingEvents: MacroEvent[] = []
 let recordingStartTime = 0
 let recordingPausedAt = 0
 let recordingAccumulatedPause = 0
+let playbackPaused = false
 
 /** Compute the correct recording elapsed time (excluding pauses) */
 function getRecordingElapsed(): number {
@@ -228,13 +229,20 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       }
 
       const totalDuration = macro.duration / macro.playbackSettings.speed
+      playbackPaused = false
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
       updateOverlayStatus('playing', 0, totalDuration)
       player!.play(macro, (state: PlaybackState) => {
         mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
-        updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs, totalDuration)
+        // Don't override overlay status while paused — player may fire one more
+        // progress callback after pause before entering the wait loop
+        if (!playbackPaused) {
+          updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs, totalDuration)
+        }
         if (state.status === 'idle') {
+          playbackPaused = false
           mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+          updateOverlayStatus('idle')
         }
       })
       return { success: true }
@@ -244,6 +252,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.PLAYBACK_STOP, async () => {
+    playbackPaused = false
     player!.stop()
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
@@ -251,6 +260,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.PLAYBACK_PAUSE, async () => {
+    playbackPaused = true
     player!.pause()
     mainWindow.webContents.send(IPC.APP_STATUS, 'paused')
     updateOverlayStatus('paused')
@@ -258,6 +268,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.PLAYBACK_RESUME, async () => {
+    playbackPaused = false
     player!.resume()
     mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
     updateOverlayStatus('playing')
