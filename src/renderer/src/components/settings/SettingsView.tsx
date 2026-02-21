@@ -187,6 +187,15 @@ function GeneralSettings({
           onChange={(v) => onUpdate({ general: { ...settings.general, showOverlayWidget: v } })}
         />
       </SettingRow>
+      <SettingRow
+        label="Auto-Save"
+        description="Automatically save editor changes every 60 seconds"
+      >
+        <Toggle
+          checked={settings.general.autoSave !== false}
+          onChange={(v) => onUpdate({ general: { ...settings.general, autoSave: v } })}
+        />
+      </SettingRow>
     </>
   )
 }
@@ -334,6 +343,9 @@ function HotkeySettings({
       </SettingRow>
       <SettingRow label="Stop Recording" description="End the current recording">
         <HotkeyInput value={hk.recordStop} onChange={(v) => updateHotkey('recordStop', v)} />
+      </SettingRow>
+      <SettingRow label="Toggle Pause" description="Pause/resume recording or playback">
+        <HotkeyInput value={hk.togglePause} onChange={(v) => updateHotkey('togglePause', v)} />
       </SettingRow>
       <SettingRow label="Start Playback" description="Play the selected macro">
         <HotkeyInput value={hk.playStart} onChange={(v) => updateHotkey('playStart', v)} />

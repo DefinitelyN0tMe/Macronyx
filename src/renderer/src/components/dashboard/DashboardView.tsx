@@ -1,10 +1,12 @@
 import { useMacroStore } from '../../stores/macroStore'
 import { useAppStore } from '../../stores/appStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { formatDuration } from '../../utils/formatTime'
 
 export function DashboardView(): JSX.Element {
   const macros = useMacroStore((s) => s.macros)
   const setActiveView = useAppStore((s) => s.setActiveView)
+  const hotkeys = useSettingsStore((s) => s.settings.hotkeys)
   const recentMacros = macros.slice(0, 5)
 
   return (
@@ -135,13 +137,35 @@ export function DashboardView(): JSX.Element {
         )}
       </div>
 
+      {/* Hotkey Quick Reference */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          padding: '10px 14px',
+          background: 'var(--bg-secondary)',
+          borderRadius: 8,
+          border: '1px solid var(--border-subtle)',
+          marginTop: 24,
+          fontSize: 11
+        }}
+      >
+        <DashHotkeyBadge label="Record" hotkey={hotkeys.recordStart} />
+        <DashHotkeyBadge label="Stop Rec" hotkey={hotkeys.recordStop} />
+        <DashHotkeyBadge label="Pause" hotkey={hotkeys.togglePause} color="#f59e0b" />
+        <DashHotkeyBadge label="Play" hotkey={hotkeys.playStart} />
+        <DashHotkeyBadge label="Stop Play" hotkey={hotkeys.playStop} />
+        <DashHotkeyBadge label="Emergency" hotkey={hotkeys.emergencyStop} color="var(--danger)" />
+      </div>
+
       {/* Stats */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 12,
-          marginTop: 24
+          marginTop: 12
         }}
       >
         <StatCard label="Total Macros" value={String(macros.length)} />
@@ -199,6 +223,32 @@ function QuickActionCard({
       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{description}</div>
     </button>
+  )
+}
+
+function DashHotkeyBadge({ label, hotkey, color }: { label: string; hotkey: string; color?: string }): JSX.Element {
+  const c = color || 'var(--accent-cyan)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, fontSize: 10 }}>
+        {label}
+      </span>
+      <kbd
+        style={{
+          padding: '2px 8px',
+          borderRadius: 4,
+          background: `${c}15`,
+          border: `1px solid ${c}40`,
+          color: c,
+          fontFamily: 'monospace',
+          fontWeight: 600,
+          letterSpacing: 0.5,
+          fontSize: 11
+        }}
+      >
+        {hotkey}
+      </kbd>
+    </div>
   )
 }
 

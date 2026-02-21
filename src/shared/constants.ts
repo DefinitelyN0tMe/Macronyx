@@ -52,7 +52,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     minimizeToTray: true,
     launchOnStartup: false,
     portableMode: false,
-    showOverlayWidget: true
+    showOverlayWidget: true,
+    autoSave: true
   },
   recording: {
     captureMouseMovement: true,
@@ -71,6 +72,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hotkeys: {
     recordStart: 'F9',
     recordStop: 'F10',
+    togglePause: 'F12',
     playStart: 'F11',
     playStop: 'Shift+F11',
     emergencyStop: 'Escape'

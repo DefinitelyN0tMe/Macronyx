@@ -6,6 +6,7 @@ type OverlayStatus = 'idle' | 'recording' | 'playing' | 'paused'
 interface StatusUpdate {
   status: OverlayStatus
   elapsedMs: number
+  totalDurationMs: number
 }
 
 const statusConfig: Record<OverlayStatus, { color: string; label: string }> = {
@@ -25,6 +26,7 @@ function formatTime(ms: number): string {
 function OverlayWidget(): JSX.Element {
   const [status, setStatus] = useState<OverlayStatus>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [totalDurationMs, setTotalDurationMs] = useState(0)
   const [hovered, setHovered] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const baseElapsedRef = useRef(0)
@@ -35,6 +37,8 @@ function OverlayWidget(): JSX.Element {
       const update = data as StatusUpdate
       setStatus(update.status)
       setElapsedMs(update.elapsedMs)
+      if (update.totalDurationMs) setTotalDurationMs(update.totalDurationMs)
+      if (update.status === 'idle') setTotalDurationMs(0)
       // Store the elapsed offset so local timer can continue from it
       baseElapsedRef.current = update.elapsedMs
       timerStartRef.current = Date.now()
@@ -132,14 +136,14 @@ function OverlayWidget(): JSX.Element {
       {showTimer && (
         <span
           style={{
-            fontSize: 12,
+            fontSize: totalDurationMs > 0 ? 11 : 12,
             fontWeight: 500,
             color: config.color,
             fontVariantNumeric: 'tabular-nums',
             letterSpacing: 0.5
           }}
         >
-          {formatTime(elapsedMs)}
+          {formatTime(elapsedMs)}{totalDurationMs > 0 && ` / ${formatTime(totalDurationMs)}`}
         </span>
       )}
 

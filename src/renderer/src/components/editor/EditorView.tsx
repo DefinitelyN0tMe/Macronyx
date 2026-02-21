@@ -24,7 +24,8 @@ export function EditorView(): JSX.Element {
   const setActiveView = useAppStore((s) => s.setActiveView)
   const status = useAppStore((s) => s.status)
   const loadMacros = useMacroStore((s) => s.loadMacros)
-  const hotkeys = useSettingsStore((s) => s.settings.hotkeys)
+  const settings = useSettingsStore((s) => s.settings)
+  const hotkeys = settings.hotkeys
 
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
@@ -53,12 +54,13 @@ export function EditorView(): JSX.Element {
     await window.api.stopPlayback()
   }, [])
 
-  // Auto-save every 60s when dirty
+  // Auto-save every 60s when dirty (respects settings toggle)
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   useEffect(() => {
     autoSaveTimerRef.current = setInterval(async () => {
+      const autoSaveEnabled = useSettingsStore.getState().settings.general.autoSave !== false
       const state = useEditorStore.getState()
-      if (state.isDirty && state.macro) {
+      if (autoSaveEnabled && state.isDirty && state.macro) {
         await state.saveMacro()
         await loadMacros()
       }
@@ -438,10 +440,16 @@ export function EditorView(): JSX.Element {
       </div>
 
       {/* Hotkey hints */}
-      <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--text-muted)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, flexWrap: 'wrap' }}>
         <span>Play: <kbd style={{ color: 'var(--accent-cyan)', fontFamily: 'monospace' }}>{hotkeys.playStart}</kbd></span>
+        <span>Pause: <kbd style={{ color: '#f59e0b', fontFamily: 'monospace' }}>{hotkeys.togglePause}</kbd></span>
         <span>Stop: <kbd style={{ color: 'var(--accent-cyan)', fontFamily: 'monospace' }}>{hotkeys.playStop}</kbd></span>
-        <span>Emergency: <kbd style={{ color: 'var(--danger)', fontFamily: 'monospace' }}>{hotkeys.emergencyStop}</kbd></span>
+        <span style={{ color: 'var(--border-color)' }}>|</span>
+        <span>Select all: <kbd style={{ color: 'var(--accent-violet)', fontFamily: 'monospace' }}>Ctrl+A</kbd></span>
+        <span>Copy: <kbd style={{ color: 'var(--accent-violet)', fontFamily: 'monospace' }}>Ctrl+C</kbd></span>
+        <span>Paste: <kbd style={{ color: 'var(--accent-violet)', fontFamily: 'monospace' }}>Ctrl+V</kbd></span>
+        <span>Undo: <kbd style={{ color: 'var(--accent-violet)', fontFamily: 'monospace' }}>Ctrl+Z</kbd></span>
+        <span>Delete: <kbd style={{ color: 'var(--danger)', fontFamily: 'monospace' }}>Del</kbd></span>
       </div>
 
       {/* Main content: Timeline + Inspector */}

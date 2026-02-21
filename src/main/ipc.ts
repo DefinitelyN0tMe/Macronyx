@@ -164,11 +164,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         humanizeAmount: currentSettings.playback.defaultHumanizeAmount
       }
 
+      const totalDuration = macro.duration / macro.playbackSettings.speed
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
-      updateOverlayStatus('playing', 0)
+      updateOverlayStatus('playing', 0, totalDuration)
       player!.play(macro, (state: PlaybackState) => {
         mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
-        updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs)
+        updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs, totalDuration)
         if (state.status === 'idle') {
           mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
         }
@@ -369,6 +370,9 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
   })
   hotkeyManager.setCallback('recordStop', () => {
     mainWindow.webContents.send('hotkey:action', 'recordStop')
+  })
+  hotkeyManager.setCallback('togglePause', () => {
+    mainWindow.webContents.send('hotkey:action', 'togglePause')
   })
   hotkeyManager.setCallback('playStart', () => {
     mainWindow.webContents.send('hotkey:action', 'playStart')

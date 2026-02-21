@@ -116,6 +116,7 @@ export function LibraryView(): JSX.Element {
         }}
       >
         <HotkeyBadge label="Play" hotkey={hotkeys.playStart} />
+        <HotkeyBadge label="Pause" hotkey={hotkeys.togglePause} color="#f59e0b" />
         <HotkeyBadge label="Stop" hotkey={hotkeys.playStop} />
         <HotkeyBadge label="Record" hotkey={hotkeys.recordStart} />
         <HotkeyBadge label="Emergency" hotkey={hotkeys.emergencyStop} color="var(--danger)" />

@@ -50,7 +50,7 @@ export function AppShell(): JSX.Element {
           break
         }
         case 'recordStop': {
-          if (currentStatus === 'recording') {
+          if (currentStatus === 'recording' || currentStatus === 'recording_paused') {
             const result = (await window.api.stopRecording()) as {
               success: boolean
               macro?: Macro
@@ -75,6 +75,18 @@ export function AppShell(): JSX.Element {
         case 'playStop': {
           if (currentStatus === 'playing' || currentStatus === 'paused') {
             await window.api.stopPlayback()
+          }
+          break
+        }
+        case 'togglePause': {
+          if (currentStatus === 'recording') {
+            await window.api.pauseRecording()
+          } else if (currentStatus === 'recording_paused') {
+            await window.api.resumeRecording()
+          } else if (currentStatus === 'playing') {
+            await window.api.pausePlayback()
+          } else if (currentStatus === 'paused') {
+            await window.api.resumePlayback()
           }
           break
         }

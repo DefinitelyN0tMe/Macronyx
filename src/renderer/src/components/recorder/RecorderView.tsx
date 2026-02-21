@@ -207,7 +207,7 @@ function HotkeyInfoBar({
   hotkeys,
   isRecording
 }: {
-  hotkeys: { recordStart: string; recordStop: string; playStart: string; playStop: string; emergencyStop: string }
+  hotkeys: { recordStart: string; recordStop: string; togglePause: string; playStart: string; playStop: string; emergencyStop: string }
   isRecording: boolean
 }): JSX.Element {
   return (
@@ -221,7 +221,7 @@ function HotkeyInfoBar({
         background: 'var(--bg-secondary)',
         borderRadius: 8,
         border: '1px solid var(--border-subtle)',
-        maxWidth: 420,
+        maxWidth: 480,
         width: '100%'
       }}
     >
@@ -229,6 +229,12 @@ function HotkeyInfoBar({
         label="Start"
         hotkey={hotkeys.recordStart}
         active={!isRecording}
+      />
+      <HotkeyBadge
+        label="Pause"
+        hotkey={hotkeys.togglePause}
+        color="#f59e0b"
+        active={isRecording}
       />
       <HotkeyBadge
         label="Stop"

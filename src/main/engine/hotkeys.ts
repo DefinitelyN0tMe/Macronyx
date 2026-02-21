@@ -1,7 +1,7 @@
 import { globalShortcut } from 'electron'
 import type { AppSettings } from '../../shared/types'
 
-type HotkeyAction = 'recordStart' | 'recordStop' | 'playStart' | 'playStop' | 'emergencyStop'
+type HotkeyAction = 'recordStart' | 'recordStop' | 'togglePause' | 'playStart' | 'playStop' | 'emergencyStop'
 
 export class HotkeyManager {
   private registeredAccelerators: string[] = []
@@ -17,6 +17,7 @@ export class HotkeyManager {
     const mappings: [HotkeyAction, string][] = [
       ['recordStart', hotkeys.recordStart],
       ['recordStop', hotkeys.recordStop],
+      ['togglePause', hotkeys.togglePause],
       ['playStart', hotkeys.playStart],
       ['playStop', hotkeys.playStop],
       ['emergencyStop', hotkeys.emergencyStop]

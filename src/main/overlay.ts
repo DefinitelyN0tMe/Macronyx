@@ -7,6 +7,7 @@ import type { AppStatus } from '../shared/types'
 let overlayWindow: BrowserWindow | null = null
 let currentStatus: AppStatus = 'idle'
 let elapsedMs = 0
+let totalDurationMs = 0
 let overlayEnabled = true
 
 export function createOverlayWindow(): void {
@@ -77,9 +78,11 @@ export function hideOverlay(): void {
   overlayWindow?.hide()
 }
 
-export function updateOverlayStatus(status: AppStatus, elapsed?: number): void {
+export function updateOverlayStatus(status: AppStatus, elapsed?: number, totalDuration?: number): void {
   currentStatus = status
   if (elapsed !== undefined) elapsedMs = elapsed
+  if (totalDuration !== undefined) totalDurationMs = totalDuration
+  if (status === 'idle') totalDurationMs = 0
   sendStatusToOverlay()
 }
 
@@ -87,7 +90,8 @@ function sendStatusToOverlay(): void {
   if (!overlayWindow || overlayWindow.isDestroyed()) return
   overlayWindow.webContents.send(IPC.OVERLAY_STATUS, {
     status: currentStatus,
-    elapsedMs
+    elapsedMs,
+    totalDurationMs
   })
 }
 

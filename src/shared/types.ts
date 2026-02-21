@@ -55,6 +55,7 @@ export interface AppSettings {
     launchOnStartup: boolean
     portableMode: boolean
     showOverlayWidget: boolean
+    autoSave: boolean
   }
   recording: {
     captureMouseMovement: boolean
@@ -73,6 +74,7 @@ export interface AppSettings {
   hotkeys: {
     recordStart: string
     recordStop: string
+    togglePause: string
     playStart: string
     playStop: string
     emergencyStop: string

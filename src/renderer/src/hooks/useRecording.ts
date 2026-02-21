@@ -5,14 +5,14 @@ import { useMacroStore } from '../stores/macroStore'
 
 export function useRecording() {
   const status = useAppStore((s) => s.status)
+  const recordingStartedAt = useAppStore((s) => s.recordingStartedAt)
+  const recordingAccumulatedPause = useAppStore((s) => s.recordingAccumulatedPause)
+  const recordingPausedAt = useAppStore((s) => s.recordingPausedAt)
   const { loadMacros } = useMacroStore()
   const [eventCount, setEventCount] = useState(0)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [lastMacro, setLastMacro] = useState<Macro | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const startTimeRef = useRef(0)
-  const pausedAtRef = useRef(0)
-  const accumulatedPauseRef = useRef(0)
 
   const isRecording = status === 'recording' || status === 'recording_paused'
   const isPaused = status === 'recording_paused'
@@ -36,52 +36,40 @@ export function useRecording() {
     return unsub
   }, [])
 
-  // Timer management based on status transitions
+  // Timer management — uses appStore values (survive navigation)
   useEffect(() => {
     if (status === 'recording') {
-      if (pausedAtRef.current > 0) {
-        // Resuming from pause
-        accumulatedPauseRef.current += Date.now() - pausedAtRef.current
-        pausedAtRef.current = 0
-      } else if (startTimeRef.current === 0) {
-        // Fresh recording start
-        setEventCount(0)
-        setElapsedMs(0)
-        startTimeRef.current = Date.now()
-        accumulatedPauseRef.current = 0
-      }
-      // Start/restart the display timer
       if (timerRef.current) clearInterval(timerRef.current)
       timerRef.current = setInterval(() => {
-        setElapsedMs(Date.now() - startTimeRef.current - accumulatedPauseRef.current)
+        const { recordingStartedAt: start, recordingAccumulatedPause: pause } = useAppStore.getState()
+        if (start > 0) {
+          setElapsedMs(Date.now() - start - pause)
+        }
       }, 50)
     } else if (status === 'recording_paused') {
-      // Freeze the timer
+      // Freeze the timer — compute frozen value from store
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
-      if (pausedAtRef.current === 0) {
-        pausedAtRef.current = Date.now()
+      if (recordingStartedAt > 0 && recordingPausedAt > 0) {
+        setElapsedMs(recordingPausedAt - recordingStartedAt - recordingAccumulatedPause)
       }
     } else {
-      // Idle or other — full cleanup
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
-      startTimeRef.current = 0
-      pausedAtRef.current = 0
-      accumulatedPauseRef.current = 0
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [status])
+  }, [status, recordingStartedAt, recordingPausedAt, recordingAccumulatedPause])
 
   const startRecording = useCallback(async () => {
     setEventCount(0)
     setElapsedMs(0)
+    useAppStore.getState().startRecordingTimer()
     await window.api.startRecording()
   }, [])
 
@@ -90,6 +78,7 @@ export function useRecording() {
       success: boolean
       macro?: Macro
     }
+    useAppStore.getState().resetRecordingTimer()
     if (result.success && result.macro) {
       setLastMacro(result.macro)
       await loadMacros()
@@ -97,10 +86,12 @@ export function useRecording() {
   }, [loadMacros])
 
   const pauseRecording = useCallback(async () => {
+    useAppStore.getState().pauseRecordingTimer()
     await window.api.pauseRecording()
   }, [])
 
   const resumeRecording = useCallback(async () => {
+    useAppStore.getState().resumeRecordingTimer()
     await window.api.resumeRecording()
   }, [])
 
