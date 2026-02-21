@@ -37,7 +37,7 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.3 — "Playback Intelligence" *(released)*
+## v1.3 — "Playback Intelligence" *(released — v1.3.1)*
 
 | Feature | Description | Size | Status |
 |---------|-------------|:----:|:------:|
@@ -47,6 +47,8 @@ A living document outlining planned features, improvements, and long-term vision
 | Conditional logic | If/else branching in macros (check pixel color, window title, time of day) | L | Done |
 | Relative positioning mode | Record mouse positions relative to active window, not absolute screen coords | M | Done |
 | Playback preview | Visualize playback on MousePathPreview without actually moving the cursor | S | Done |
+| Profile management UI | Create/switch/rename/delete settings profiles from Settings → Profiles tab | M | Done |
+| v1.3.1 hotfix | Fix playback regression, nested conditionals, trigger reload, chain hotkeys, pause recording | M | Done |
 
 ---
 

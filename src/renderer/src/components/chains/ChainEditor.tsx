@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useChainStore } from '../../stores/chainStore'
-import type { Macro, MacroChain } from '@shared/types'
+import { useAppStore } from '../../stores/appStore'
+import type { Macro } from '@shared/types'
 
 export function ChainEditor(): JSX.Element {
   const chains = useChainStore((s) => s.chains)
@@ -14,34 +15,58 @@ export function ChainEditor(): JSX.Element {
   const updateStep = useChainStore((s) => s.updateStep)
   const saveChain = useChainStore((s) => s.saveChain)
 
+  const appStatus = useAppStore((s) => s.status)
+
   const [macros, setMacros] = useState<Macro[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
+
+  const selectedChain = chains.find((c) => c.id === selectedChainId) || null
 
   useEffect(() => {
     loadChains()
     window.api.listMacros().then((list: Macro[]) => setMacros(list || []))
   }, [loadChains])
 
-  const selectedChain = chains.find((c) => c.id === selectedChainId) || null
+  // Sync local isPlaying with global app status
+  useEffect(() => {
+    if (appStatus === 'idle' && isPlaying) {
+      setIsPlaying(false)
+    }
+  }, [appStatus, isPlaying])
 
-  const handleCreate = async (): Promise<void> => {
-    await createChain(`Chain ${chains.length + 1}`)
-  }
-
-  const handlePlay = async (): Promise<void> => {
-    if (!selectedChain) return
+  const handlePlay = useCallback(async (): Promise<void> => {
+    // Read fresh state to avoid stale closures
+    const { chains: currentChains, selectedChainId: currentId } = useChainStore.getState()
+    const chain = currentChains.find((c) => c.id === currentId)
+    if (!chain || chain.steps.length === 0) return
     setIsPlaying(true)
     try {
-      await window.api.playChain(selectedChain.id)
+      await window.api.playChain(chain.id)
     } catch {
       // Error handled
     }
     setIsPlaying(false)
-  }
+  }, [])
 
-  const handleStop = (): void => {
+  const handleStop = useCallback((): void => {
     window.api.stopChain()
     setIsPlaying(false)
+  }, [])
+
+  // Listen for global hotkeys (play/stop) while on the Chains page
+  useEffect(() => {
+    const cleanup = window.api.onHotkeyAction((action: string) => {
+      if (action === 'playStart') {
+        handlePlay()
+      } else if (action === 'playStop') {
+        handleStop()
+      }
+    })
+    return cleanup
+  }, [handlePlay, handleStop])
+
+  const handleCreate = async (): Promise<void> => {
+    await createChain(`Chain ${chains.length + 1}`)
   }
 
   const getMacroName = (macroId: string): string => {
@@ -154,7 +179,7 @@ export function ChainEditor(): JSX.Element {
                     fontSize: 13
                   }}
                 >
-                  Play Chain
+                  ▶ Play Chain
                 </button>
               ) : (
                 <button
@@ -170,7 +195,7 @@ export function ChainEditor(): JSX.Element {
                     fontSize: 13
                   }}
                 >
-                  Stop
+                  ■ Stop
                 </button>
               )}
               <button
@@ -188,6 +213,28 @@ export function ChainEditor(): JSX.Element {
               >
                 Delete
               </button>
+            </div>
+
+            {/* Hotkey hint */}
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
+              <span>
+                <kbd style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', fontSize: 10 }}>
+                  F11
+                </kbd>{' '}
+                Play
+              </span>
+              <span>
+                <kbd style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', fontSize: 10 }}>
+                  F12
+                </kbd>{' '}
+                Stop
+              </span>
+              <span>
+                <kbd style={{ padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', fontSize: 10 }}>
+                  Esc
+                </kbd>{' '}
+                Emergency Stop
+              </span>
             </div>
 
             {/* Steps */}

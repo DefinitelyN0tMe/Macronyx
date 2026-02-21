@@ -50,6 +50,26 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 - Undo/redo support for all operations
 - Zoom and scroll navigation
 
+### Automation & Triggers
+- **Trigger-based macros** — start macros automatically based on:
+  - **Hotkey combo** — press-to-record custom key combinations
+  - **Schedule** — cron-based scheduling with quick presets (every 5 min, hourly, daily, weekdays)
+  - **Window focus** — auto-play when a specific app gains focus (match by process name, title substring, or regex)
+  - **Pixel color** — auto-play when a pixel at (X,Y) matches a target color within tolerance
+- **Conditional logic (IF/ELSE/END)** — branch macro execution based on runtime checks:
+  - Pixel color at a position
+  - Active window title (contains, equals, regex)
+  - Time of day (after/before)
+  - Supports nesting (IF inside IF)
+- **Macro chaining** — run macros in sequence (A → B → C) with configurable delays between steps; drag-to-reorder, per-step enable/disable
+- **Relative positioning** — record mouse coordinates relative to the active window so macros adapt when windows move or resize
+- **Playback preview** — animated cursor visualization on the mouse path canvas without moving the real cursor
+
+### Profiles
+- **Settings profiles** — save snapshots of your current settings as named profiles; switch between them to quickly change configurations
+- **Profile auto-switch** — automatically activate a settings profile when a specific application gains focus (configure rules by process name, window title, or regex)
+- Create, rename, update, and delete profiles from Settings → Profiles tab
+
 ### Macro Library
 - Save and organize recorded macros
 - Search macros by name, description, or tags
@@ -127,6 +147,45 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 7. View the cursor path on the **Mouse Path Preview** canvas
 8. Undo/Redo for safe editing — all operations are undoable
 9. Changes auto-save every 60 seconds, or click **Save** manually
+
+### Triggers & Automation
+
+1. Open a macro in the **Editor** and switch to the **Triggers** tab
+2. Click **"+ Add"** and choose a trigger type:
+   - **Hotkey combo** — press the key combination you want to use
+   - **Schedule** — enter a cron expression or click a quick preset
+   - **Window focus** — set a match type (process/title contains/title regex) and value
+   - **Pixel color** — set X, Y coordinates, target color, and tolerance
+3. Toggle the trigger ON and **Save** the macro
+4. Enable triggers globally in **Settings → General → Enable Triggers**
+
+### Conditional Logic (IF/ELSE/END)
+
+1. Open a macro in the **Editor → Timeline** tab
+2. Click the green **"+ IF"** button in the toolbar
+3. Select the **IF** event on the timeline → configure the condition in the **Event Inspector**:
+   - **Pixel color**: check if pixel at (X,Y) matches a target color
+   - **Window title**: check if the foreground window matches a pattern
+   - **Time of day**: check if the current time is within a range
+4. Place events between **IF** and **ELSE** (executed when condition is **true**)
+5. Place events between **ELSE** and **END** (executed when condition is **false**)
+6. Conditions can be nested (IF inside IF)
+
+### Macro Chains
+
+1. Go to the **Chains** page from the sidebar
+2. Click **"+ New Chain"** to create a chain
+3. Add macros to the chain from the dropdown; drag to reorder
+4. Set delay between steps (ms), toggle steps on/off
+5. Press **Play** or use the **F11** hotkey to run the chain
+
+### Profiles
+
+1. Go to **Settings → Profiles** tab
+2. Enter a name and click **"Save Current as Profile"** to snapshot your current settings
+3. Click **Activate** on any profile to switch to its settings
+4. **Double-click** a profile name to rename it, or use the ✏ button
+5. To auto-switch profiles based on the foreground app, enable **Auto-Switch Profiles** in Settings → General and add rules
 
 ### Silent Mode
 

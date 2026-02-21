@@ -94,6 +94,9 @@ export class Recorder {
   }
 
   private addEvent(event: MacroEvent): void {
+    // Double-check: never add events while paused (belt-and-suspenders guard)
+    if (this.isPaused || !this.isRecording) return
+
     // Attach relative positioning data if enabled
     if (this.settings?.relativePositioning && event.x !== undefined && event.y !== undefined) {
       try {

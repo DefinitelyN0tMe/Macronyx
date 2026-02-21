@@ -76,6 +76,29 @@ function cleanupOrphanedKeyDowns(): void {
   }
 }
 
+/**
+ * Pause the active window service polling.
+ * The AW service and the player share the same PowerShell process on Windows.
+ * Concurrent sendQuery + sendFireAndForget on the same stdin/stdout breaks
+ * command/response parsing, so we must stop polling during playback.
+ */
+function pauseActiveWindowPolling(): void {
+  try {
+    getActiveWindowService().stop()
+  } catch {
+    // Non-fatal
+  }
+}
+
+/** Resume active window polling after playback finishes */
+function resumeActiveWindowPolling(): void {
+  try {
+    getActiveWindowService().start(500)
+  } catch {
+    // Non-fatal
+  }
+}
+
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   macroStorage = new MacroStorage()
   chainStorage = new ChainStorage()
@@ -249,6 +272,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         humanizeAmount: currentSettings.playback.defaultHumanizeAmount
       }
 
+      // CRITICAL: Pause active window polling during playback.
+      // The AW service uses sendQuery() on the same PowerShell process
+      // the player uses for sendFireAndForget — concurrent access breaks
+      // stdout parsing and causes playback commands to be silently lost.
+      pauseActiveWindowPolling()
+
       const totalDuration = macro.duration / macro.playbackSettings.speed
       playbackPaused = false
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
@@ -264,6 +293,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
           playbackPaused = false
           mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
           updateOverlayStatus('idle')
+          // Restart active window polling after playback finishes
+          resumeActiveWindowPolling()
         }
       })
       return { success: true }
@@ -277,6 +308,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     player!.stop() // also releases any held keys
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
+    // Restart active window polling
+    resumeActiveWindowPolling()
     return { success: true }
   })
 
@@ -327,10 +360,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     try {
       macro.updatedAt = new Date().toISOString()
       await macroStorage!.save(macro)
-      // Reload triggers if triggers are enabled
+      // Reload and restart triggers if enabled
       const settings = await settingsStorage!.get()
       if (settings.general.enableTriggers && triggerManager) {
+        triggerManager.stop()
         await reloadTriggers()
+        triggerManager.start()
       }
       return { success: true }
     } catch (err) {
@@ -406,6 +441,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const chain = await chainStorage!.load(chainId)
       if (!chain) return { success: false, error: 'Chain not found' }
 
+      // Pause AW polling during chain playback (same PowerShell issue)
+      pauseActiveWindowPolling()
+
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
       updateOverlayStatus('playing')
 
@@ -417,6 +455,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
           if (state.status === 'idle') {
             mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
             updateOverlayStatus('idle')
+            resumeActiveWindowPolling()
           }
         }
       )
@@ -430,6 +469,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     chainPlayer!.stop()
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
+    resumeActiveWindowPolling()
     return { success: true }
   })
 
@@ -544,6 +584,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       if (profile) {
         await settingsStorage!.set(profile.settings)
         setupHotkeys(mainWindow, profile.settings)
+        mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId: id, profileName: profile.name })
       }
       return { success: true }
     } catch (err) {
@@ -600,6 +641,8 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
           humanize: currentSettings.playback.defaultHumanize,
           humanizeAmount: currentSettings.playback.defaultHumanizeAmount
         }
+        // Pause AW during trigger-fired playback too
+        pauseActiveWindowPolling()
         mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
         updateOverlayStatus('playing')
         player!.play(macro, (state: PlaybackState) => {
@@ -607,6 +650,7 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
           if (state.status === 'idle') {
             mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
             updateOverlayStatus('idle')
+            resumeActiveWindowPolling()
           }
         })
       }
@@ -691,6 +735,8 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
     currentRecordingEvents = []
     mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
+    // Ensure AW polling is restored after emergency stop
+    resumeActiveWindowPolling()
     if (!mainWindow.isVisible()) {
       mainWindow.show()
       mainWindow.focus()

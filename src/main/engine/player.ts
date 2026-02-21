@@ -35,9 +35,22 @@ export class Player {
       for (let repeat = 0; repeat < totalRepeats; repeat++) {
         if (!this.isPlaying) break
 
-        // Condition evaluation state: stack for nested conditionals
-        const skipStack: { skipUntil: 'condition_else' | 'condition_end'; pairId: string }[] = []
-        let skipping = false
+        // Condition evaluation state: stack for nested conditionals.
+        // Each entry tracks whether its branch is currently skipping,
+        // and whether the entire block is inside a skipped outer branch.
+        const condStack: {
+          pairId: string
+          branchSkipping: boolean // true = currently in a skipped branch at THIS level
+          outerSkipped: boolean   // true = entire block is inside a skipped outer
+        }[] = []
+
+        /** Returns true if events should be skipped based on the condition stack */
+        const shouldSkip = (): boolean => {
+          for (const entry of condStack) {
+            if (entry.outerSkipped || entry.branchSkipping) return true
+          }
+          return false
+        }
 
         for (let i = 0; i < macro.events.length; i++) {
           if (!this.isPlaying) break
@@ -51,48 +64,41 @@ export class Player {
 
           // ─── Conditional logic evaluation ────────────────────────
           if (event.type === 'condition_start') {
-            const result = await this.evaluateCondition(event.condition)
-            if (result) {
-              // Condition true: execute true branch, will skip at condition_else
-              skipStack.push({ skipUntil: 'condition_else', pairId: event.conditionPairId || '' })
-              skipping = false
+            const pairId = event.conditionPairId || ''
+            if (shouldSkip()) {
+              // Inside a skipped outer branch — don't evaluate, skip entire nested block
+              condStack.push({ pairId, branchSkipping: true, outerSkipped: true })
             } else {
-              // Condition false: skip to condition_else
-              skipStack.push({ skipUntil: 'condition_else', pairId: event.conditionPairId || '' })
-              skipping = true
+              const result = await this.evaluateCondition(event.condition)
+              // true → execute true branch (branchSkipping=false)
+              // false → skip true branch (branchSkipping=true)
+              condStack.push({ pairId, branchSkipping: !result, outerSkipped: false })
             }
             continue
           }
 
           if (event.type === 'condition_else') {
-            const top = skipStack[skipStack.length - 1]
+            const top = condStack[condStack.length - 1]
             if (top && top.pairId === event.conditionPairId) {
-              if (skipping) {
-                // Was skipping (false branch) → now execute else branch
-                skipping = false
-                top.skipUntil = 'condition_end'
-              } else {
-                // Was executing (true branch) → now skip else branch
-                skipping = true
-                top.skipUntil = 'condition_end'
+              if (!top.outerSkipped) {
+                // Flip: was executing → now skip, was skipping → now execute
+                top.branchSkipping = !top.branchSkipping
               }
+              // If outerSkipped, keep skipping the entire block
             }
             continue
           }
 
           if (event.type === 'condition_end') {
-            const top = skipStack[skipStack.length - 1]
+            const top = condStack[condStack.length - 1]
             if (top && top.pairId === event.conditionPairId) {
-              skipStack.pop()
-              // Restore skipping state from outer scope
-              skipping = skipStack.length > 0 &&
-                skipStack[skipStack.length - 1].skipUntil === 'condition_end'
+              condStack.pop()
             }
             continue
           }
 
           // Skip events if inside a false conditional branch
-          if (skipping) continue
+          if (shouldSkip()) continue
 
           // ─── Normal event execution ──────────────────────────────
           let delay = event.delay / speed

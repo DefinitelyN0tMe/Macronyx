@@ -4,7 +4,7 @@ import { HotkeyInput } from '../common/HotkeyInput'
 import type { AppSettings, ProfileRule, Profile } from '@shared/types'
 import { v4 as uuid } from 'uuid'
 
-type Tab = 'general' | 'recording' | 'playback' | 'hotkeys' | 'advanced'
+type Tab = 'general' | 'recording' | 'playback' | 'hotkeys' | 'profiles' | 'advanced'
 
 export function SettingsView(): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>('general')
@@ -15,6 +15,7 @@ export function SettingsView(): JSX.Element {
     { id: 'recording', label: 'Recording' },
     { id: 'playback', label: 'Playback' },
     { id: 'hotkeys', label: 'Hotkeys' },
+    { id: 'profiles', label: 'Profiles' },
     { id: 'advanced', label: 'Advanced' }
   ]
 
@@ -75,6 +76,9 @@ export function SettingsView(): JSX.Element {
         )}
         {activeTab === 'hotkeys' && (
           <HotkeySettings settings={settings} onUpdate={updateSettings} />
+        )}
+        {activeTab === 'profiles' && (
+          <ProfileSettings settings={settings} onUpdate={updateSettings} />
         )}
         {activeTab === 'advanced' && <AdvancedSettings />}
       </div>
@@ -446,8 +450,8 @@ function AdvancedSettings(): JSX.Element {
 
   return (
     <>
-      <SettingRow label="Version" description="Macronyx v1.3.0">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.0</span>
+      <SettingRow label="Version" description="Macronyx v1.3.1">
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.1</span>
       </SettingRow>
       <SettingRow
         label="Portable Mode"
@@ -507,6 +511,306 @@ function AdvancedSettings(): JSX.Element {
           Reset to Defaults
         </button>
       </div>
+    </>
+  )
+}
+
+/* ─── Profile Management ───────────────────────────────────────────── */
+
+function ProfileSettings({
+  settings,
+  onUpdate
+}: {
+  settings: AppSettings
+  onUpdate: (s: Partial<AppSettings>) => void
+}): JSX.Element {
+  const [profiles, setProfiles] = useState<Profile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newName, setNewName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+
+  const loadProfiles = useCallback(async () => {
+    try {
+      const list = (await window.api.listProfiles()) as Profile[]
+      setProfiles(list || [])
+    } catch {
+      setProfiles([])
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadProfiles()
+  }, [loadProfiles])
+
+  const handleCreate = async (): Promise<void> => {
+    const name = newName.trim()
+    if (!name) return
+    const profile: Profile = {
+      id: uuid(),
+      name,
+      settings: { ...settings },
+      isActive: false
+    }
+    await window.api.saveProfile(profile)
+    setNewName('')
+    await loadProfiles()
+  }
+
+  const handleActivate = async (id: string): Promise<void> => {
+    await window.api.activateProfile(id)
+    // Reload settings in the store so the UI reflects the new profile's settings
+    await useSettingsStore.getState().loadSettings()
+    await loadProfiles()
+  }
+
+  const handleRename = async (profile: Profile): Promise<void> => {
+    const name = editingName.trim()
+    if (!name) return
+    await window.api.saveProfile({ ...profile, name })
+    setEditingId(null)
+    setEditingName('')
+    await loadProfiles()
+  }
+
+  const handleDelete = async (id: string): Promise<void> => {
+    await window.api.deleteProfile(id)
+    await loadProfiles()
+  }
+
+  const handleUpdateFromCurrent = async (profile: Profile): Promise<void> => {
+    await window.api.saveProfile({
+      ...profile,
+      settings: { ...settings }
+    })
+    await loadProfiles()
+  }
+
+  const inputStyle: React.CSSProperties = {
+    padding: '6px 10px',
+    borderRadius: 6,
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-primary)',
+    color: 'var(--text-primary)',
+    fontSize: 13
+  }
+
+  if (loading) {
+    return (
+      <div style={{ color: 'var(--text-secondary)', fontSize: 13, padding: 16 }}>
+        Loading profiles...
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
+        Profiles save a snapshot of your current settings (recording, playback, hotkeys, general options).
+        Switch between profiles to quickly change configurations. Use{' '}
+        <strong style={{ color: 'var(--accent-cyan)' }}>Auto-Switch Profiles</strong> in General
+        settings to switch automatically based on the active window.
+      </div>
+
+      {/* Create new profile */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          marginBottom: 16,
+          padding: 12,
+          background: 'rgba(6, 182, 212, 0.05)',
+          borderRadius: 8,
+          border: '1px solid rgba(6, 182, 212, 0.15)'
+        }}
+      >
+        <input
+          type="text"
+          placeholder="New profile name..."
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate()
+          }}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          onClick={handleCreate}
+          disabled={!newName.trim()}
+          style={{
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 14px',
+            background: newName.trim() ? 'var(--accent-cyan)' : 'var(--bg-secondary)',
+            color: newName.trim() ? '#000' : 'var(--text-secondary)',
+            cursor: newName.trim() ? 'pointer' : 'default',
+            fontSize: 12,
+            fontWeight: 600,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          + Save Current as Profile
+        </button>
+      </div>
+
+      {/* Profile list */}
+      {profiles.length === 0 ? (
+        <div
+          style={{
+            color: 'var(--text-secondary)',
+            fontSize: 13,
+            textAlign: 'center',
+            padding: 30,
+            background: 'var(--bg-primary)',
+            borderRadius: 8,
+            border: '1px dashed var(--border-color)'
+          }}
+        >
+          No profiles yet. Enter a name and click &quot;Save Current as Profile&quot; to create one.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {profiles.map((profile) => (
+            <div
+              key={profile.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                background: profile.isActive
+                  ? 'rgba(6, 182, 212, 0.08)'
+                  : 'var(--bg-primary)',
+                borderRadius: 8,
+                border: `1px solid ${profile.isActive ? 'rgba(6, 182, 212, 0.3)' : 'var(--border-color)'}`,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {/* Active indicator */}
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: profile.isActive ? '#22c55e' : '#374151',
+                  flexShrink: 0
+                }}
+                title={profile.isActive ? 'Active profile' : 'Inactive'}
+              />
+
+              {/* Name (editable) */}
+              {editingId === profile.id ? (
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRename(profile)
+                    if (e.key === 'Escape') {
+                      setEditingId(null)
+                      setEditingName('')
+                    }
+                  }}
+                  onBlur={() => handleRename(profile)}
+                  autoFocus
+                  style={{ ...inputStyle, flex: 1, fontWeight: 500 }}
+                />
+              ) : (
+                <div
+                  style={{ flex: 1, cursor: 'pointer' }}
+                  onDoubleClick={() => {
+                    setEditingId(profile.id)
+                    setEditingName(profile.name)
+                  }}
+                  title="Double-click to rename"
+                >
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {profile.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
+                    {profile.isActive ? '● Active' : 'Double-click to rename'}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                {!profile.isActive && (
+                  <button
+                    onClick={() => handleActivate(profile.id)}
+                    title="Activate this profile (loads its settings)"
+                    style={{
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '4px 10px',
+                      background: 'rgba(6, 182, 212, 0.15)',
+                      color: 'var(--accent-cyan)',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      fontWeight: 600
+                    }}
+                  >
+                    Activate
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleUpdateFromCurrent(profile)}
+                  title="Overwrite this profile with current settings"
+                  style={{
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    background: 'rgba(139, 92, 246, 0.15)',
+                    color: '#8b5cf6',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontWeight: 600
+                  }}
+                >
+                  Update
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditingId(profile.id)
+                    setEditingName(profile.name)
+                  }}
+                  title="Rename"
+                  style={{
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontSize: 12
+                  }}
+                >
+                  ✏
+                </button>
+
+                <button
+                  onClick={() => handleDelete(profile.id)}
+                  title="Delete profile"
+                  style={{
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: 14
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   )
 }

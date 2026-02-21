@@ -5,6 +5,30 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-02-22 — "Playback Intelligence" (Hotfix)
+
+### Added
+- **Profile management UI** — new "Profiles" tab in Settings to create, switch, rename, update, and delete settings profiles; shows active profile with green indicator
+- **Hotkey hints on Chain Editor** — shows F11 Play, F12 Stop, Esc Emergency Stop badges
+- **Cron schedule presets** — quick-fill buttons for common schedules (Every 5 min, Every hour, Daily 9:00, Mon-Fri 8:30, Every 15 min)
+- **Cron format help** — detailed field explanations with ranges and syntax reference in the schedule trigger editor
+
+### Fixed
+- **Playback not replaying** — ActiveWindowService polling shared the same PowerShell process as the player; concurrent stdin/stdout access broke command parsing and silently dropped playback commands. Fixed by pausing AW polling during all playback (macros, chains, trigger-fired)
+- **Recording continued during pause** — added belt-and-suspenders guard in `addEvent()` that blocks new events when `isPaused` is true
+- **Nested conditional logic broken** — entering a nested IF inside a skipped outer branch incorrectly evaluated the inner condition and flipped the skip state. Rewrote condition stack with per-entry `outerSkipped`/`branchSkipping` tracking so nested conditions inside skipped branches are fully skipped without evaluation
+- **Triggers not registering after macro update** — `MACRO_UPDATE` handler only called `reloadTriggers()` without stopping/restarting the trigger manager; new triggers were never activated. Fixed with full stop→reload→start cycle
+- **Hotkey trigger used text input** — replaced manual text input with press-to-record `HotkeyInput` component for trigger hotkeys
+- **Chain Editor hotkey listener leak** — `useEffect` had no dependency array, re-registering the listener on every render. Refactored with `useCallback` + proper deps, and `getState()` to avoid stale closures
+- **Chain Editor `appStatus` field missing** — referenced `s.appStatus` on the store (undefined) instead of `s.status`, breaking the isPlaying sync with global state
+- **Profile activate not updating UI** — `PROFILE_ACTIVATE` IPC handler now sends `PROFILE_ACTIVATED` event to renderer so the settings store reloads
+
+### Changed
+- Window focus trigger editor shows per-matchType help text and improved placeholders
+- Pixel color trigger shows polling frequency note
+- Trigger Panel shows general info about enabling triggers in Settings
+- Emergency stop restores ActiveWindowService polling
+
 ## [1.3.0] - 2026-02-21 — "Playback Intelligence"
 
 ### Added
