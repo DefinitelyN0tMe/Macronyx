@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cron format help** — detailed field explanations with ranges and syntax reference in the schedule trigger editor
 
 ### Fixed
-- **Playback not replaying** — ActiveWindowService polling shared the same PowerShell process as the player; concurrent stdin/stdout access broke command parsing and silently dropped playback commands. Fixed by pausing AW polling during all playback (macros, chains, trigger-fired)
+- **Playback not replaying + EPIPE crash** — ActiveWindowService, PixelSampler, and Player all shared the same PowerShell process; concurrent `sendQuery()` (marker-based stdout parsing) and `sendFireAndForget()` (write-only stdin) on the same process caused command corruption, silently dropped playback commands, and EPIPE crashes when the process died. **Fix: created a dedicated query process** (`query-process.ts`) for Active Window and Pixel Color queries, completely isolating them from the input simulator used by the Player. Added EPIPE error handling to `sendFireAndForget()` and `sendCommand()` with `stdin.on('error')` handler to prevent uncaught exceptions
+- **Chain playback immediately stopping** — Chain Editor's `isPlaying` state was set to `false` immediately after the `playChain()` IPC call returned (IPC returns immediately, chain plays async in background). Fixed with bidirectional `appStatus` sync — `isPlaying` now tracks the global status correctly
 - **Recording continued during pause** — added belt-and-suspenders guard in `addEvent()` that blocks new events when `isPaused` is true
 - **Nested conditional logic broken** — entering a nested IF inside a skipped outer branch incorrectly evaluated the inner condition and flipped the skip state. Rewrote condition stack with per-entry `outerSkipped`/`branchSkipping` tracking so nested conditions inside skipped branches are fully skipped without evaluation
 - **Triggers not registering after macro update** — `MACRO_UPDATE` handler only called `reloadTriggers()` without stopping/restarting the trigger manager; new triggers were never activated. Fixed with full stop→reload→start cycle
@@ -27,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Window focus trigger editor shows per-matchType help text and improved placeholders
 - Pixel color trigger shows polling frequency note
 - Trigger Panel shows general info about enabling triggers in Settings
-- Emergency stop restores ActiveWindowService polling
+- Input simulator PowerShell process no longer includes Active Window / Pixel Color C# code (moved to dedicated query process)
 
 ## [1.3.0] - 2026-02-21 — "Playback Intelligence"
 

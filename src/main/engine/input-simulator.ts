@@ -4,7 +4,6 @@
 // macOS: Uses cliclick or AppleScript
 
 import { spawn, ChildProcess, execSync } from 'child_process'
-import type { WindowInfo } from '../../shared/types'
 
 interface InputSimulator {
   moveMouse(x: number, y: number): Promise<void>
@@ -16,20 +15,25 @@ interface InputSimulator {
   mouseScroll(deltaY: number): Promise<void>
   keyDown(keyName: string): Promise<void>
   keyUp(keyName: string): Promise<void>
-  /** Get active foreground window info */
-  getActiveWindow?(): Promise<WindowInfo | null>
-  /** Get pixel color at screen coordinate */
-  getPixelColor?(x: number, y: number): Promise<{ r: number; g: number; b: number } | null>
+  // NOTE: getActiveWindow() and getPixelColor() have been moved to query-process.ts
   destroy(): void
 }
 
 // ─── Windows Simulator using persistent PowerShell ─────────────────────
+// IMPORTANT: This process is used ONLY for input simulation (mouse/keyboard).
+// Active Window queries and Pixel Color sampling use a SEPARATE process
+// (query-process.ts) to avoid stdin/stdout interference.
 class WindowsSimulator implements InputSimulator {
   private proc: ChildProcess | null = null
   private ready = false
+  private readyPromise: Promise<void>
+  private readyResolve!: () => void
   private queue: { resolve: () => void; reject: (err: Error) => void; done: boolean }[] = []
 
   constructor() {
+    this.readyPromise = new Promise((resolve) => {
+      this.readyResolve = resolve
+    })
     this.init()
   }
 
@@ -38,6 +42,11 @@ class WindowsSimulator implements InputSimulator {
     this.proc = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-Command', '-'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true
+    })
+
+    // Prevent uncaught EPIPE on stdin when the process dies
+    this.proc.stdin?.on('error', (err) => {
+      console.error('InputSimulator stdin error:', err.message)
     })
 
     // Preload required assemblies and define helper functions
@@ -172,73 +181,8 @@ public class NativeInput {
         SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
     }
 
-    // ─── Active Window Detection ─────────────────────────────────────
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
-
-    [DllImport("user32.dll")]
-    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
-
-    [DllImport("user32.dll")]
-    public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-
-    public static string GetActiveWindowInfo() {
-        IntPtr hwnd = GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return "{}";
-
-        var sb = new System.Text.StringBuilder(512);
-        GetWindowText(hwnd, sb, 512);
-        string title = sb.ToString().Replace("\\", "\\\\").Replace("\"", "\\\"");
-
-        uint pid = 0;
-        GetWindowThreadProcessId(hwnd, out pid);
-        string processName = "";
-        try {
-            var proc = System.Diagnostics.Process.GetProcessById((int)pid);
-            processName = proc.ProcessName;
-        } catch {}
-
-        RECT rect;
-        GetWindowRect(hwnd, out rect);
-
-        return "{\"title\":\"" + title + "\",\"processName\":\"" + processName +
-               "\",\"hwnd\":" + hwnd.ToInt64() +
-               ",\"bounds\":{\"x\":" + rect.Left + ",\"y\":" + rect.Top +
-               ",\"width\":" + (rect.Right - rect.Left) +
-               ",\"height\":" + (rect.Bottom - rect.Top) + "}}";
-    }
-
-    // ─── Pixel Color Sampling ────────────────────────────────────────
-    [DllImport("user32.dll")]
-    public static extern IntPtr GetDC(IntPtr hWnd);
-
-    [DllImport("gdi32.dll")]
-    public static extern uint GetPixel(IntPtr hdc, int x, int y);
-
-    [DllImport("user32.dll")]
-    public static extern int ReleaseDC(IntPtr hWnd, IntPtr hdc);
-
-    public static string GetPixelColorAt(int x, int y) {
-        IntPtr hdc = GetDC(IntPtr.Zero);
-        uint pixel = GetPixel(hdc, x, y);
-        ReleaseDC(IntPtr.Zero, hdc);
-        if (pixel == 0xFFFFFFFF) return "null";
-        int r = (int)(pixel & 0xFF);
-        int g = (int)((pixel >> 8) & 0xFF);
-        int b = (int)((pixel >> 16) & 0xFF);
-        return r + "," + g + "," + b;
-    }
+    // NOTE: Active Window and Pixel Color queries are handled by a separate
+    // PowerShell process (query-process.ts) to avoid stdin/stdout interference.
 }
 '@
 Write-Output "READY"
@@ -247,8 +191,9 @@ Write-Output "READY"
 
     this.proc.stdout?.on('data', (data: Buffer) => {
       const text = data.toString()
-      if (text.includes('READY')) {
+      if (text.includes('READY') && !this.ready) {
         this.ready = true
+        this.readyResolve()
       }
       // Count how many "OK" responses arrived in this chunk and resolve that many pending commands
       const okCount = (text.match(/\bOK\b/g) || []).length
@@ -273,6 +218,12 @@ Write-Output "READY"
     })
   }
 
+  /** Wait until the PowerShell process has finished Add-Type compilation */
+  async waitForReady(): Promise<void> {
+    if (this.ready) return
+    await this.readyPromise
+  }
+
   private sendCommand(cmd: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.proc || !this.proc.stdin) {
@@ -281,7 +232,16 @@ Write-Output "READY"
       }
       const entry = { resolve, reject, done: false }
       this.queue.push(entry)
-      this.proc.stdin.write(cmd + '; Write-Output "OK"\n')
+      try {
+        this.proc.stdin.write(cmd + '; Write-Output "OK"\n')
+      } catch {
+        // EPIPE — process died
+        entry.done = true
+        const idx = this.queue.indexOf(entry)
+        if (idx !== -1) this.queue.splice(idx, 1)
+        resolve()
+        return
+      }
 
       // Timeout to prevent hanging — only resolve if not already done
       setTimeout(() => {
@@ -297,55 +257,16 @@ Write-Output "READY"
     })
   }
 
-  /** Send a command and capture the output (for queries like GetActiveWindow) */
-  private sendQuery(cmd: string): Promise<string> {
-    return new Promise((resolve) => {
-      if (!this.proc || !this.proc.stdin || !this.proc.stdout) {
-        resolve('')
-        return
-      }
-
-      let result = ''
-      const marker = `__QUERY_${Date.now()}__`
-
-      const onData = (data: Buffer): void => {
-        const text = data.toString()
-        result += text
-
-        // Look for our end marker
-        const markerIdx = result.indexOf(marker)
-        if (markerIdx !== -1) {
-          this.proc?.stdout?.removeListener('data', onData)
-          // Extract content between start and marker
-          const startMarker = `__START${marker.slice(7)}`
-          const startIdx = result.indexOf(startMarker)
-          if (startIdx !== -1) {
-            const content = result.slice(startIdx + startMarker.length, markerIdx).trim()
-            resolve(content)
-          } else {
-            resolve('')
-          }
-        }
-      }
-
-      this.proc.stdout.on('data', onData)
-      // Write command that outputs the result between markers
-      this.proc.stdin.write(
-        `Write-Output "__START${marker.slice(7)}"; ${cmd}; Write-Output "${marker}"\n`
-      )
-
-      // Timeout fallback
-      setTimeout(() => {
-        this.proc?.stdout?.removeListener('data', onData)
-        resolve('')
-      }, 500)
-    })
-  }
-
   // Fast fire-and-forget for mouse movement (no waiting for response)
   private sendFireAndForget(cmd: string): void {
     if (!this.proc || !this.proc.stdin) return
-    this.proc.stdin.write(cmd + '\n')
+    try {
+      this.proc.stdin.write(cmd + '\n')
+    } catch {
+      // EPIPE — process has died, silently ignore
+      // The 'close' handler will invalidate the singleton and
+      // a new process will be created on the next getInputSimulator() call
+    }
   }
 
   async moveMouse(x: number, y: number): Promise<void> {
@@ -401,31 +322,9 @@ Write-Output "READY"
     this.sendFireAndForget(`[NativeInput]::KeyEvent(${vk}, ${scan}, $true)`)
   }
 
-  async getActiveWindow(): Promise<WindowInfo | null> {
-    try {
-      const result = await this.sendQuery('[NativeInput]::GetActiveWindowInfo()')
-      if (!result || result === '{}') return null
-      return JSON.parse(result) as WindowInfo
-    } catch {
-      return null
-    }
-  }
-
-  async getPixelColor(x: number, y: number): Promise<{ r: number; g: number; b: number } | null> {
-    try {
-      const result = await this.sendQuery(
-        `[NativeInput]::GetPixelColorAt(${Math.round(x)}, ${Math.round(y)})`
-      )
-      if (!result || result === 'null') return null
-      const parts = result.split(',').map(Number)
-      if (parts.length === 3) {
-        return { r: parts[0], g: parts[1], b: parts[2] }
-      }
-      return null
-    } catch {
-      return null
-    }
-  }
+  // NOTE: getActiveWindow() and getPixelColor() are no longer on this process.
+  // They have been moved to the dedicated query-process.ts to avoid
+  // stdin/stdout interference with input simulation commands.
 
   destroy(): void {
     if (this.proc) {

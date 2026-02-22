@@ -1,10 +1,12 @@
 // Active Window Service — polls the foreground window at configurable intervals
-// Cross-platform: Windows (Win32 via PowerShell), Linux (xdotool), macOS (osascript)
+// Cross-platform: Windows (dedicated query process), Linux (xdotool), macOS (osascript)
+// IMPORTANT: On Windows this uses a SEPARATE PowerShell process (query-process.ts)
+// to avoid stdin/stdout interference with the input simulator used by the Player.
 
 import { EventEmitter } from 'events'
 import { execSync } from 'child_process'
 import type { WindowInfo } from '../../shared/types'
-import { getInputSimulator } from './input-simulator'
+import { getQueryProcess } from './query-process'
 
 export class ActiveWindowService extends EventEmitter {
   private interval: ReturnType<typeof setInterval> | null = null
@@ -75,11 +77,7 @@ export class ActiveWindowService extends EventEmitter {
 
   private async getActiveWindowWindows(): Promise<WindowInfo | null> {
     try {
-      const sim = getInputSimulator()
-      if ('getActiveWindow' in sim) {
-        return (sim as { getActiveWindow: () => Promise<WindowInfo | null> }).getActiveWindow()
-      }
-      return null
+      return await getQueryProcess().getActiveWindow()
     } catch {
       return null
     }

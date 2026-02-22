@@ -27,12 +27,16 @@ export function ChainEditor(): JSX.Element {
     window.api.listMacros().then((list: Macro[]) => setMacros(list || []))
   }, [loadChains])
 
-  // Sync local isPlaying with global app status
+  // Sync local isPlaying with global app status (bidirectional)
+  // The chain play IPC returns immediately (chain plays async in background),
+  // so we can't rely on the await in handlePlay — we must sync from appStatus.
   useEffect(() => {
-    if (appStatus === 'idle' && isPlaying) {
+    if (appStatus === 'playing' || appStatus === 'paused') {
+      setIsPlaying(true)
+    } else if (appStatus === 'idle') {
       setIsPlaying(false)
     }
-  }, [appStatus, isPlaying])
+  }, [appStatus])
 
   const handlePlay = useCallback(async (): Promise<void> => {
     // Read fresh state to avoid stale closures
@@ -43,9 +47,11 @@ export function ChainEditor(): JSX.Element {
     try {
       await window.api.playChain(chain.id)
     } catch {
-      // Error handled
+      setIsPlaying(false)
     }
-    setIsPlaying(false)
+    // NOTE: Do NOT setIsPlaying(false) here — the IPC returns immediately
+    // while the chain plays async in background. The appStatus sync effect
+    // above will set isPlaying=false when status becomes 'idle'.
   }, [])
 
   const handleStop = useCallback((): void => {

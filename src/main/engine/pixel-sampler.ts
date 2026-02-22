@@ -1,8 +1,10 @@
 // Pixel Color Sampling Service — reads pixel colors from the screen
-// Cross-platform: Windows (Win32 via PowerShell), Linux (xdotool+import), macOS (screencapture)
+// Cross-platform: Windows (Win32 via dedicated query process), Linux (ImageMagick), macOS (screencapture)
+// IMPORTANT: On Windows this uses the SEPARATE query process (query-process.ts)
+// to avoid stdin/stdout interference with the input simulator used by the Player.
 
 import { execSync } from 'child_process'
-import { getInputSimulator } from './input-simulator'
+import { getQueryProcess } from './query-process'
 
 export interface RGB {
   r: number
@@ -44,12 +46,7 @@ export class PixelSampler {
 
   private async getPixelWindows(x: number, y: number): Promise<RGB | null> {
     try {
-      const sim = getInputSimulator()
-      if ('getPixelColor' in sim) {
-        return (sim as { getPixelColor: (x: number, y: number) => Promise<RGB | null> })
-          .getPixelColor(x, y)
-      }
-      return null
+      return await getQueryProcess().getPixelColor(x, y)
     } catch {
       return null
     }
