@@ -5,6 +5,11 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-02-22 — "Relative Positioning Upgrade"
+
+### Fixed
+- **Relative positioning completely reworked** — previous implementation relied on `GetForegroundWindow()` which always returned Macronyx during playback. Now uses .NET `Process.GetProcessesByName()` + `MainWindowHandle` to find the target window by process name regardless of which window is focused. Window bounds are cached and refreshed every 500ms (instead of querying per-event), eliminating playback lag. Cross-platform: Linux uses `xdotool search`, macOS uses `osascript` process lookup.
+
 ## [1.3.4] - 2026-02-22 — "Trigger & Polish"
 
 ### Added

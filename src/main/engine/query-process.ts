@@ -104,6 +104,41 @@ public class QueryHelper {
         int b = (int)((pixel >> 16) & 0xFF);
         return r + "," + g + "," + b;
     }
+
+    // ── Window lookup by process name ──────────────────────────────
+    // Uses .NET Process.GetProcessesByName + MainWindowHandle to find
+    // a visible window belonging to a named process, even when it is
+    // NOT the foreground window. No delegates/callbacks — compiles
+    // reliably inside PowerShell Add-Type.
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    public static string FindWindowByProcessName(string targetProcess) {
+        try {
+            var procs = System.Diagnostics.Process.GetProcessesByName(targetProcess);
+            foreach (var p in procs) {
+                try {
+                    IntPtr hwnd = p.MainWindowHandle;
+                    if (hwnd == IntPtr.Zero) continue;
+                    if (!IsWindowVisible(hwnd)) continue;
+                    var sb = new System.Text.StringBuilder(512);
+                    GetWindowText(hwnd, sb, 512);
+                    string title = sb.ToString();
+                    if (string.IsNullOrEmpty(title)) continue;
+                    string safeTitle = title.Replace("\\\\", "\\\\\\\\").Replace("\\"", "\\\\\\"");
+                    RECT rect;
+                    GetWindowRect(hwnd, out rect);
+                    return "{\\"title\\":\\"" + safeTitle + "\\",\\"processName\\":\\"" + p.ProcessName +
+                           "\\",\\"hwnd\\":" + hwnd.ToInt64() +
+                           ",\\"bounds\\":{\\"x\\":" + rect.Left + ",\\"y\\":" + rect.Top +
+                           ",\\"width\\":" + (rect.Right - rect.Left) +
+                           ",\\"height\\":" + (rect.Bottom - rect.Top) + "}}";
+                } catch {} finally { try { p.Dispose(); } catch {} }
+            }
+        } catch {}
+        return "{}";
+    }
 }
 '@
 Write-Output "READY"
@@ -190,6 +225,21 @@ Write-Output "READY"
   async getActiveWindow(): Promise<WindowInfo | null> {
     try {
       const result = await this.sendQuery('[QueryHelper]::GetActiveWindowInfo()')
+      if (!result || result === '{}') return null
+      return JSON.parse(result) as WindowInfo
+    } catch {
+      return null
+    }
+  }
+
+  /** Find a window by process name (case-insensitive).
+   *  Returns the first visible, titled window matching the process name,
+   *  regardless of whether it's the foreground window. */
+  async getWindowByProcessName(processName: string): Promise<WindowInfo | null> {
+    try {
+      // Sanitize process name to prevent injection
+      const safe = processName.replace(/[^a-zA-Z0-9._-]/g, '')
+      const result = await this.sendQuery(`[QueryHelper]::FindWindowByProcessName("${safe}")`)
       if (!result || result === '{}') return null
       return JSON.parse(result) as WindowInfo
     } catch {

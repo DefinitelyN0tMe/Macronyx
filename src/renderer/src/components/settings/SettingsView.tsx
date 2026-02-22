@@ -450,8 +450,8 @@ function AdvancedSettings(): JSX.Element {
 
   return (
     <>
-      <SettingRow label="Version" description="Macronyx v1.3.4">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.4</span>
+      <SettingRow label="Version" description="Macronyx v1.3.5">
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.5</span>
       </SettingRow>
       <SettingRow
         label="Portable Mode"

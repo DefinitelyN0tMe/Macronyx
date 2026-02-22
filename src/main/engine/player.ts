@@ -18,6 +18,11 @@ export class Player {
   private liveHumanize = false
   private liveHumanizeAmount = 10
 
+  // Relative positioning cache — avoids querying PowerShell for every single event.
+  // Populated once before playback starts, refreshed every 500ms during playback.
+  private windowBoundsCache = new Map<string, { x: number; y: number; updatedAt: number }>()
+  private static readonly WINDOW_CACHE_TTL = 500 // ms
+
   /** Check if player is currently playing */
   getIsPlaying(): boolean {
     return this.isPlaying
@@ -56,6 +61,10 @@ export class Player {
     const sim = getInputSimulator()
     this.activeSim = sim
     this.heldKeys.clear()
+    this.windowBoundsCache.clear()
+
+    // Pre-populate window bounds cache so the first events resolve instantly
+    await this.warmWindowCache(macro.events)
 
     try {
       for (let repeat = 0; repeat < totalRepeats; repeat++) {
@@ -190,6 +199,7 @@ export class Player {
   stop(): void {
     this.isPlaying = false
     this.isPaused = false
+    this.windowBoundsCache.clear()
     // Release any keys still held to prevent stuck keys
     this.releaseAllHeldKeys()
   }
@@ -212,7 +222,55 @@ export class Player {
     destroyInputSimulator()
   }
 
-  /** Resolve relative positioning — compute absolute coords from window-relative offsets */
+  /** Pre-populate the window bounds cache for all process names referenced in the macro.
+   *  Called once before playback starts so the first events don't need to wait. */
+  private async warmWindowCache(events: MacroEvent[]): Promise<void> {
+    const processNames = new Set<string>()
+    for (const e of events) {
+      if (e.relativeToWindow) processNames.add(e.relativeToWindow.processName.toLowerCase())
+    }
+    if (processNames.size === 0) return
+
+    const awService = getActiveWindowService()
+    for (const name of processNames) {
+      try {
+        const info = await awService.getWindowByProcessName(name)
+        if (info?.bounds) {
+          this.windowBoundsCache.set(name, {
+            x: info.bounds.x,
+            y: info.bounds.y,
+            updatedAt: Date.now()
+          })
+        }
+      } catch {
+        // Best effort
+      }
+    }
+  }
+
+  /** Refresh cached bounds for a process name if the cache entry is stale (>500ms). */
+  private async refreshWindowBounds(processName: string): Promise<void> {
+    const key = processName.toLowerCase()
+    const cached = this.windowBoundsCache.get(key)
+    if (cached && Date.now() - cached.updatedAt < Player.WINDOW_CACHE_TTL) return
+
+    try {
+      const awService = getActiveWindowService()
+      const info = await awService.getWindowByProcessName(key)
+      if (info?.bounds) {
+        this.windowBoundsCache.set(key, {
+          x: info.bounds.x,
+          y: info.bounds.y,
+          updatedAt: Date.now()
+        })
+      }
+    } catch {
+      // Keep stale cache rather than clearing
+    }
+  }
+
+  /** Resolve relative positioning — compute absolute coords from window-relative offsets.
+   *  Uses a local bounds cache (refreshed every 500ms) to avoid per-event PowerShell queries. */
   private async resolvePosition(
     event: MacroEvent
   ): Promise<{ x: number; y: number }> {
@@ -220,44 +278,19 @@ export class Player {
     let y = event.y ?? 0
 
     if (event.relativeToWindow) {
-      try {
-        const awService = getActiveWindowService()
-        let current = awService.getCurrent()
+      const key = event.relativeToWindow.processName.toLowerCase()
 
-        // Case-insensitive process name comparison
-        const targetProcess = event.relativeToWindow.processName.toLowerCase()
+      // Refresh cache if stale (non-blocking for fresh entries, ~20ms for stale)
+      await this.refreshWindowBounds(event.relativeToWindow.processName)
 
-        // If cached window doesn't match (e.g. Macronyx is focused after clicking Play),
-        // force a fresh poll to get the actual foreground window
-        if (!current || !current.bounds || current.processName.toLowerCase() !== targetProcess) {
-          const fresh = await awService.pollOnce()
-          if (fresh) current = fresh
-        }
-
-        if (current && current.bounds) {
-          // Match by process name (case-insensitive)
-          if (current.processName.toLowerCase() === targetProcess) {
-            x = current.bounds.x + event.relativeToWindow.offsetX
-            y = current.bounds.y + event.relativeToWindow.offsetY
-          } else if (
-            // Fallback: match by title prefix (case-insensitive) for apps that report
-            // different process names between recording and playback
-            event.relativeToWindow.title &&
-            current.title.toLowerCase().includes(
-              event.relativeToWindow.title.toLowerCase().slice(0, 20)
-            )
-          ) {
-            x = current.bounds.x + event.relativeToWindow.offsetX
-            y = current.bounds.y + event.relativeToWindow.offsetY
-          } else {
-            // Fallback: use absolute coords
-            console.warn(
-              `Relative positioning: expected "${event.relativeToWindow.processName}", got "${current.processName}". Using absolute coords.`
-            )
-          }
-        }
-      } catch {
-        // Fallback to absolute coords
+      const cached = this.windowBoundsCache.get(key)
+      if (cached) {
+        x = cached.x + event.relativeToWindow.offsetX
+        y = cached.y + event.relativeToWindow.offsetY
+      } else {
+        console.warn(
+          `Relative positioning: window "${event.relativeToWindow.processName}" not found. Using absolute coords.`
+        )
       }
     }
 
