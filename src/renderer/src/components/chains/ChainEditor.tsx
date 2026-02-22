@@ -39,6 +39,9 @@ export function ChainEditor(): JSX.Element {
   }, [appStatus])
 
   const handlePlay = useCallback(async (): Promise<void> => {
+    // Guard: ignore if already playing (prevents F11 double-press issues)
+    if (isPlaying) return
+
     // Read fresh state to avoid stale closures
     const { chains: currentChains, selectedChainId: currentId } = useChainStore.getState()
     const chain = currentChains.find((c) => c.id === currentId)
@@ -52,7 +55,7 @@ export function ChainEditor(): JSX.Element {
     // NOTE: Do NOT setIsPlaying(false) here — the IPC returns immediately
     // while the chain plays async in background. The appStatus sync effect
     // above will set isPlaying=false when status becomes 'idle'.
-  }, [])
+  }, [isPlaying])
 
   const handleStop = useCallback((): void => {
     window.api.stopChain()

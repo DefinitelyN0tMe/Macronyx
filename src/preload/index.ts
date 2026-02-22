@@ -80,6 +80,8 @@ const api = {
   getActiveWindow: () => ipcRenderer.invoke(IPC.ACTIVE_WINDOW_INFO),
   // Pixel sampling
   getPixelColor: (x: number, y: number) => ipcRenderer.invoke(IPC.PIXEL_SAMPLE, x, y),
+  // Pixel pick from screen (hides window, waits for click, returns position + color)
+  pickPixelFromScreen: () => ipcRenderer.invoke(IPC.PIXEL_PICK),
 
   minimizeWindow: () => ipcRenderer.send(IPC.WINDOW_MINIMIZE),
   maximizeWindow: () => ipcRenderer.send(IPC.WINDOW_MAXIMIZE),

@@ -102,6 +102,8 @@ export interface ChainPlaybackState {
   currentStepIndex: number
   totalSteps: number
   currentMacroId: string | null
+  currentRepeat?: number
+  totalRepeats?: number
 }
 
 // ─── Triggers ──────────────────────────────────────────────────────────

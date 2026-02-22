@@ -1,5 +1,13 @@
 // Chain Player — executes macro chains (A → B → C) sequentially
-import type { MacroChain, Macro, ChainPlaybackState, PlaybackState } from '../../shared/types'
+// Supports: playback settings (speed, humanize, repeat), per-macro overlay updates,
+// chain-level repeat (repeatCount = full chain cycles), and re-entry guards.
+import type {
+  MacroChain,
+  Macro,
+  ChainPlaybackState,
+  PlaybackState,
+  PlaybackSettings
+} from '../../shared/types'
 import { Player } from './player'
 
 export class ChainPlayer {
@@ -17,7 +25,9 @@ export class ChainPlayer {
   async play(
     chain: MacroChain,
     loadMacro: (id: string) => Promise<Macro | null>,
-    onProgress: (state: ChainPlaybackState) => void
+    onProgress: (state: ChainPlaybackState) => void,
+    playbackSettings?: PlaybackSettings,
+    onMacroProgress?: (state: PlaybackState) => void
   ): Promise<void> {
     if (this.isPlaying) {
       this.stop()
@@ -32,46 +42,86 @@ export class ChainPlayer {
 
     const enabledSteps = chain.steps.filter((s) => s.enabled)
 
-    try {
-      for (let i = 0; i < enabledSteps.length; i++) {
-        if (!this.isPlaying) break
-        this.currentStepIndex = i
+    // Chain-level repeat: repeatCount applies to the entire chain
+    const totalRepeats =
+      playbackSettings && playbackSettings.repeatCount === 0
+        ? Infinity
+        : playbackSettings?.repeatCount ?? 1
 
-        const step = enabledSteps[i]
-        const macro = await loadMacro(step.macroId)
-        if (!macro) {
-          console.warn(`Chain step ${i}: macro ${step.macroId} not found, skipping`)
-          continue
+    try {
+      for (let repeat = 0; repeat < totalRepeats; repeat++) {
+        if (!this.isPlaying) break
+
+        for (let i = 0; i < enabledSteps.length; i++) {
+          if (!this.isPlaying) break
+          this.currentStepIndex = i
+
+          const step = enabledSteps[i]
+          const macro = await loadMacro(step.macroId)
+          if (!macro) {
+            console.warn(`Chain step ${i}: macro ${step.macroId} not found, skipping`)
+            continue
+          }
+
+          // Apply global playback settings to each macro (if provided)
+          // Each macro in the chain plays ONCE — chain-level repeat handles repetition
+          if (playbackSettings) {
+            macro.playbackSettings = {
+              speed: playbackSettings.speed,
+              repeatCount: 1, // Each macro plays once per chain cycle
+              repeatDelay: 0,
+              humanize: playbackSettings.humanize,
+              humanizeAmount: playbackSettings.humanizeAmount
+            }
+          }
+
+          onProgress({
+            chainId: chain.id,
+            status: 'playing',
+            currentStepIndex: i,
+            totalSteps: enabledSteps.length,
+            currentMacroId: macro.id,
+            currentRepeat: repeat + 1,
+            totalRepeats: playbackSettings?.repeatCount ?? 1
+          })
+
+          // Play the macro and wait for it to finish
+          await new Promise<void>((resolve) => {
+            this.player.play(macro, (_state: PlaybackState) => {
+              // Forward per-macro progress to caller (for overlay updates)
+              if (_state.status !== 'idle') {
+                onMacroProgress?.(_state)
+              }
+              if (_state.status === 'idle') {
+                resolve()
+              }
+            })
+          })
+
+          if (!this.isPlaying) break
+
+          // Delay between steps
+          if (step.delayAfterMs > 0 && i < enabledSteps.length - 1) {
+            const deadline = Date.now() + step.delayAfterMs
+            while (Date.now() < deadline && this.isPlaying && !this.isPaused) {
+              await new Promise((r) => setTimeout(r, Math.min(50, deadline - Date.now())))
+            }
+            // Wait while paused
+            while (this.isPaused && this.isPlaying) {
+              await new Promise((r) => setTimeout(r, 100))
+            }
+          }
         }
 
-        onProgress({
-          chainId: chain.id,
-          status: 'playing',
-          currentStepIndex: i,
-          totalSteps: enabledSteps.length,
-          currentMacroId: macro.id
-        })
-
-        // Play the macro and wait for it to finish
-        await new Promise<void>((resolve) => {
-          this.player.play(macro, (_state: PlaybackState) => {
-            if (_state.status === 'idle') {
-              resolve()
-            }
-          })
-        })
-
-        if (!this.isPlaying) break
-
-        // Delay between steps
-        if (step.delayAfterMs > 0 && i < enabledSteps.length - 1) {
-          const deadline = Date.now() + step.delayAfterMs
+        // Delay between chain repeats
+        if (
+          repeat < totalRepeats - 1 &&
+          playbackSettings?.repeatDelay &&
+          playbackSettings.repeatDelay > 0
+        ) {
+          const deadline = Date.now() + playbackSettings.repeatDelay
           while (Date.now() < deadline && this.isPlaying && !this.isPaused) {
             await new Promise((r) => setTimeout(r, Math.min(50, deadline - Date.now())))
-          }
-          // Wait while paused
-          while (this.isPaused && this.isPlaying) {
-            await new Promise((r) => setTimeout(r, 100))
           }
         }
       }
@@ -86,7 +136,9 @@ export class ChainPlayer {
       status: 'idle',
       currentStepIndex: 0,
       totalSteps: enabledSteps.length,
-      currentMacroId: null
+      currentMacroId: null,
+      currentRepeat: 0,
+      totalRepeats: playbackSettings?.repeatCount ?? 1
     })
   }
 

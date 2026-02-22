@@ -411,8 +411,21 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC.CHAIN_PLAY, async (_e, chainId: string) => {
     try {
+      // Guard: ignore if chain is already playing (prevents F11 double-press issues)
+      if (chainPlayer!.getIsPlaying()) return { success: true }
+
       const chain = await chainStorage!.load(chainId)
       if (!chain) return { success: false, error: 'Chain not found' }
+
+      // Load current playback settings to apply speed, humanize, repeat to the chain
+      const currentSettings = await settingsStorage!.get()
+      const pbSettings = {
+        speed: currentSettings.playback.defaultSpeed,
+        repeatCount: currentSettings.playback.defaultRepeatCount,
+        repeatDelay: currentSettings.playback.defaultRepeatDelay,
+        humanize: currentSettings.playback.defaultHumanize,
+        humanizeAmount: currentSettings.playback.defaultHumanizeAmount
+      }
 
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
       updateOverlayStatus('playing')
@@ -425,6 +438,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
           if (state.status === 'idle') {
             mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
             updateOverlayStatus('idle')
+          }
+        },
+        pbSettings,
+        // Per-macro progress callback — keeps overlay widget updated during chain playback
+        (macroState) => {
+          if (macroState.status === 'playing') {
+            updateOverlayStatus('playing', macroState.elapsedMs)
           }
         }
       )
@@ -457,6 +477,56 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       return await sampler.getPixelColor(x, y)
     } catch {
       return null
+    }
+  })
+
+  // Pixel pick from screen — hides window, waits for user click, returns {x, y, color}
+  ipcMain.handle(IPC.PIXEL_PICK, async () => {
+    try {
+      // Hide the app so the user can see and click on the target pixel
+      mainWindow.hide()
+      // Small delay so the window has time to fully hide
+      await new Promise((r) => setTimeout(r, 300))
+
+      const { uIOhook } = await import('uiohook-napi')
+
+      const result = await new Promise<{ x: number; y: number } | null>((resolve) => {
+        const timeout = setTimeout(() => {
+          try { uIOhook.stop() } catch { /* */ }
+          uIOhook.removeAllListeners()
+          resolve(null)
+        }, 10000) // 10s timeout
+
+        uIOhook.removeAllListeners()
+        uIOhook.on('click', (e) => {
+          clearTimeout(timeout)
+          try { uIOhook.stop() } catch { /* */ }
+          uIOhook.removeAllListeners()
+          resolve({ x: e.x, y: e.y })
+        })
+
+        uIOhook.start()
+      })
+
+      // Get pixel color at clicked position
+      let color: { r: number; g: number; b: number } | null = null
+      if (result) {
+        const sampler = getPixelSampler()
+        color = await sampler.getPixelColor(result.x, result.y)
+      }
+
+      // Show window again
+      mainWindow.show()
+      mainWindow.focus()
+
+      if (result && color) {
+        return { success: true, x: result.x, y: result.y, color }
+      }
+      return { success: false, error: 'Timeout or no click detected' }
+    } catch (err) {
+      mainWindow.show()
+      mainWindow.focus()
+      return { success: false, error: String(err) }
     }
   })
 
@@ -550,8 +620,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     try {
       const profile = await profileStorage!.activate(id)
       if (profile) {
-        await settingsStorage!.set(profile.settings)
-        setupHotkeys(mainWindow, profile.settings)
+        // Preserve profileRules from current settings — rules are global,
+        // not per-profile, so activating a profile should never erase them.
+        const currentSettings = await settingsStorage!.get()
+        const mergedSettings = { ...profile.settings, profileRules: currentSettings.profileRules }
+        await settingsStorage!.set(mergedSettings)
+        setupHotkeys(mainWindow, mergedSettings)
         mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId: id, profileName: profile.name })
       }
       return { success: true }

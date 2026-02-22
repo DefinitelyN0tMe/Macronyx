@@ -5,6 +5,19 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-02-22 — "Chain & Trigger Polish"
+
+### Added
+- **Pixel color picker** — "Pick from screen" button in pixel color triggers: hides the app, waits for the user to click anywhere on screen, captures both position (X, Y) and color automatically. No more manual coordinate/color entry
+- **Chain playback settings** — speed, humanize, and repeat count settings now apply to chains. Repeat count repeats the entire chain cycle, not individual macros. Repeat delay between chain cycles is also supported
+
+### Fixed
+- **Recording pause included wait time** — pausing during recording included the pre-pause idle time (gap between last event and pressing pause) in the macro. Now resuming starts fresh — no "thinking time" leaks into the recorded macro
+- **Profile rules erased on profile switch** — activating a profile overwrote profile auto-switch rules with the profile's saved rules (which were empty if created before rules were added). Rules are now preserved as global settings during profile activation
+- **Chain F11 double-press crash** — pressing F11 again while a chain was playing caused state corruption and crashes. Added re-entry guard at both IPC and UI level — duplicate play requests are now silently ignored
+- **Widget showed Idle during chain playback** — overlay widget only tracked the first macro in a chain, then showed "Idle" for subsequent ones. Added per-macro progress forwarding so the widget stays updated throughout the entire chain
+- **Playback settings ignored by chains** — speed, humanize, and repeat count had no effect during chain playback. Chain player now applies global playback settings to each macro in the chain
+
 ## [1.3.1] - 2026-02-22 — "Playback Intelligence" (Hotfix)
 
 ### Added

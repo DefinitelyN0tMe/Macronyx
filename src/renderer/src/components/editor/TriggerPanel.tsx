@@ -348,104 +348,157 @@ function TriggerItem({
 
       {/* ── Pixel Color ──────────────────────────────────────── */}
       {trigger.type === 'pixel_color' && trigger.pixelMatch && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>X:</label>
-            <input
-              type="number"
-              value={trigger.pixelMatch.x}
-              onChange={(e) =>
-                onUpdate({
-                  pixelMatch: { ...trigger.pixelMatch!, x: parseInt(e.target.value) || 0 }
-                })
-              }
-              style={{
-                width: 60,
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 6,
-                padding: '4px 6px',
-                color: 'var(--text-primary)',
-                fontSize: 12,
-                textAlign: 'center'
-              }}
-            />
-            <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Y:</label>
-            <input
-              type="number"
-              value={trigger.pixelMatch.y}
-              onChange={(e) =>
-                onUpdate({
-                  pixelMatch: { ...trigger.pixelMatch!, y: parseInt(e.target.value) || 0 }
-                })
-              }
-              style={{
-                width: 60,
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 6,
-                padding: '4px 6px',
-                color: 'var(--text-primary)',
-                fontSize: 12,
-                textAlign: 'center'
-              }}
-            />
-            <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Color:</label>
-            <input
-              type="color"
-              value={`#${trigger.pixelMatch.color.r.toString(16).padStart(2, '0')}${trigger.pixelMatch.color.g.toString(16).padStart(2, '0')}${trigger.pixelMatch.color.b.toString(16).padStart(2, '0')}`}
-              onChange={(e) => {
-                const hex = e.target.value
-                onUpdate({
-                  pixelMatch: {
-                    ...trigger.pixelMatch!,
-                    color: {
-                      r: parseInt(hex.slice(1, 3), 16),
-                      g: parseInt(hex.slice(3, 5), 16),
-                      b: parseInt(hex.slice(5, 7), 16)
-                    }
-                  }
-                })
-              }}
-              style={{
-                width: 32,
-                height: 24,
-                border: '1px solid var(--border-color)',
-                borderRadius: 4,
-                cursor: 'pointer'
-              }}
-            />
-            <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Tol:</label>
-            <input
-              type="number"
-              min={0}
-              max={255}
-              value={trigger.pixelMatch.tolerance}
-              onChange={(e) =>
-                onUpdate({
-                  pixelMatch: {
-                    ...trigger.pixelMatch!,
-                    tolerance: Math.max(0, Math.min(255, parseInt(e.target.value) || 0))
-                  }
-                })
-              }
-              style={{
-                width: 50,
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 6,
-                padding: '4px 6px',
-                color: 'var(--text-primary)',
-                fontSize: 12,
-                textAlign: 'center'
-              }}
-            />
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-            Fires when pixel at (X,Y) matches the target color within tolerance (0-255, lower = stricter). Polled every 1s.
-          </div>
-        </div>
+        <PixelColorEditor trigger={trigger} onUpdate={onUpdate} />
       )}
+    </div>
+  )
+}
+
+/** Pixel Color trigger editor with "Pick from screen" button */
+function PixelColorEditor({
+  trigger,
+  onUpdate
+}: {
+  trigger: TriggerConfig
+  onUpdate: (changes: Partial<TriggerConfig>) => void
+}): JSX.Element {
+  const [picking, setPicking] = useState(false)
+
+  const handlePick = async (): Promise<void> => {
+    setPicking(true)
+    try {
+      const result = await (window.api as Record<string, unknown> & {
+        pickPixelFromScreen: () => Promise<{
+          success: boolean
+          x?: number
+          y?: number
+          color?: { r: number; g: number; b: number }
+        }>
+      }).pickPixelFromScreen()
+      if (result.success && result.x !== undefined && result.y !== undefined && result.color) {
+        onUpdate({
+          pixelMatch: {
+            ...trigger.pixelMatch!,
+            x: result.x,
+            y: result.y,
+            color: result.color
+          }
+        })
+      }
+    } catch {
+      // Pick failed or was cancelled
+    }
+    setPicking(false)
+  }
+
+  const pm = trigger.pixelMatch!
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--bg-primary)',
+    border: '1px solid var(--border-color)',
+    borderRadius: 6,
+    padding: '4px 6px',
+    color: 'var(--text-primary)',
+    fontSize: 12,
+    textAlign: 'center'
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Pick from screen button */}
+      <button
+        onClick={handlePick}
+        disabled={picking}
+        style={{
+          border: '1px solid var(--accent-cyan)',
+          borderRadius: 6,
+          padding: '6px 12px',
+          background: picking ? 'rgba(6, 182, 212, 0.25)' : 'rgba(6, 182, 212, 0.1)',
+          color: 'var(--accent-cyan)',
+          cursor: picking ? 'wait' : 'pointer',
+          fontSize: 12,
+          fontWeight: 600,
+          transition: 'all 0.15s'
+        }}
+      >
+        {picking ? 'Click anywhere on screen...' : 'Pick from screen'}
+      </button>
+
+      {/* Manual input fields */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>X:</label>
+        <input
+          type="number"
+          value={pm.x}
+          onChange={(e) =>
+            onUpdate({ pixelMatch: { ...pm, x: parseInt(e.target.value) || 0 } })
+          }
+          style={{ ...inputStyle, width: 60 }}
+        />
+        <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Y:</label>
+        <input
+          type="number"
+          value={pm.y}
+          onChange={(e) =>
+            onUpdate({ pixelMatch: { ...pm, y: parseInt(e.target.value) || 0 } })
+          }
+          style={{ ...inputStyle, width: 60 }}
+        />
+        <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Color:</label>
+        <input
+          type="color"
+          value={`#${pm.color.r.toString(16).padStart(2, '0')}${pm.color.g.toString(16).padStart(2, '0')}${pm.color.b.toString(16).padStart(2, '0')}`}
+          onChange={(e) => {
+            const hex = e.target.value
+            onUpdate({
+              pixelMatch: {
+                ...pm,
+                color: {
+                  r: parseInt(hex.slice(1, 3), 16),
+                  g: parseInt(hex.slice(3, 5), 16),
+                  b: parseInt(hex.slice(5, 7), 16)
+                }
+              }
+            })
+          }}
+          style={{
+            width: 32,
+            height: 24,
+            border: '1px solid var(--border-color)',
+            borderRadius: 4,
+            cursor: 'pointer'
+          }}
+        />
+        {/* Color preview swatch */}
+        <div
+          title={`RGB(${pm.color.r}, ${pm.color.g}, ${pm.color.b})`}
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 4,
+            border: '1px solid var(--border-color)',
+            backgroundColor: `rgb(${pm.color.r}, ${pm.color.g}, ${pm.color.b})`
+          }}
+        />
+        <label style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Tol:</label>
+        <input
+          type="number"
+          min={0}
+          max={255}
+          value={pm.tolerance}
+          onChange={(e) =>
+            onUpdate({
+              pixelMatch: {
+                ...pm,
+                tolerance: Math.max(0, Math.min(255, parseInt(e.target.value) || 0))
+              }
+            })
+          }
+          style={{ ...inputStyle, width: 50 }}
+        />
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+        Fires when pixel at (X,Y) matches the target color within tolerance (0-255, lower = stricter). Polled every 1s.
+      </div>
     </div>
   )
 }

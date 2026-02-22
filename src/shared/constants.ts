@@ -58,6 +58,7 @@ export const IPC = {
   // Active window & pixel sampling
   ACTIVE_WINDOW_INFO: 'active-window:info',
   PIXEL_SAMPLE: 'pixel:sample',
+  PIXEL_PICK: 'pixel:pick',
 
   // Triggers
   TRIGGER_FIRED: 'trigger:fired'
