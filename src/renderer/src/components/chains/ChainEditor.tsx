@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useChainStore } from '../../stores/chainStore'
 import { useAppStore } from '../../stores/appStore'
 import type { Macro } from '@shared/types'
@@ -19,6 +19,8 @@ export function ChainEditor(): JSX.Element {
 
   const [macros, setMacros] = useState<Macro[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
+  // Ref mirror of isPlaying — always current, never stale in callbacks
+  const isPlayingRef = useRef(false)
 
   const selectedChain = chains.find((c) => c.id === selectedChainId) || null
 
@@ -33,29 +35,33 @@ export function ChainEditor(): JSX.Element {
   useEffect(() => {
     if (appStatus === 'playing' || appStatus === 'paused') {
       setIsPlaying(true)
+      isPlayingRef.current = true
     } else if (appStatus === 'idle') {
       setIsPlaying(false)
+      isPlayingRef.current = false
     }
   }, [appStatus])
 
   const handlePlay = useCallback(async (): Promise<void> => {
-    // Guard: ignore if already playing (prevents F11 double-press issues)
-    if (isPlaying) return
+    // Guard: use ref for instant, non-stale check (prevents F11 double-press)
+    if (isPlayingRef.current) return
 
     // Read fresh state to avoid stale closures
     const { chains: currentChains, selectedChainId: currentId } = useChainStore.getState()
     const chain = currentChains.find((c) => c.id === currentId)
     if (!chain || chain.steps.length === 0) return
     setIsPlaying(true)
+    isPlayingRef.current = true
     try {
       await window.api.playChain(chain.id)
     } catch {
       setIsPlaying(false)
+      isPlayingRef.current = false
     }
     // NOTE: Do NOT setIsPlaying(false) here — the IPC returns immediately
     // while the chain plays async in background. The appStatus sync effect
     // above will set isPlaying=false when status becomes 'idle'.
-  }, [isPlaying])
+  }, [])
 
   const handleStop = useCallback((): void => {
     window.api.stopChain()

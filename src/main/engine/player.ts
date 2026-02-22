@@ -13,6 +13,27 @@ export class Player {
   private heldKeys = new Set<string>()
   private activeSim: ReturnType<typeof getInputSimulator> | null = null
 
+  // Live playback settings — can be updated mid-play (e.g. profile auto-switch)
+  private liveSpeed = 1
+  private liveHumanize = false
+  private liveHumanizeAmount = 10
+
+  /** Check if player is currently playing */
+  getIsPlaying(): boolean {
+    return this.isPlaying
+  }
+
+  /** Update playback settings mid-play (for profile auto-switch) */
+  updatePlaybackSettings(settings: {
+    speed?: number
+    humanize?: boolean
+    humanizeAmount?: number
+  }): void {
+    if (settings.speed !== undefined) this.liveSpeed = settings.speed
+    if (settings.humanize !== undefined) this.liveHumanize = settings.humanize
+    if (settings.humanizeAmount !== undefined) this.liveHumanizeAmount = settings.humanizeAmount
+  }
+
   async play(macro: Macro, onProgress: (state: PlaybackState) => void): Promise<void> {
     // Guard against concurrent plays
     if (this.isPlaying) {
@@ -23,8 +44,13 @@ export class Player {
     this.isPaused = false
     this.onProgress = onProgress
 
-    const { speed, repeatCount, repeatDelay, humanize, humanizeAmount } = macro.playbackSettings
+    const { repeatCount, repeatDelay } = macro.playbackSettings
     const totalRepeats = repeatCount === 0 ? Infinity : repeatCount
+
+    // Initialize live settings from macro (can be updated mid-play via updatePlaybackSettings)
+    this.liveSpeed = macro.playbackSettings.speed
+    this.liveHumanize = macro.playbackSettings.humanize
+    this.liveHumanizeAmount = macro.playbackSettings.humanizeAmount
 
     // Get the input simulator (singleton, stays alive between plays)
     const sim = getInputSimulator()
@@ -101,10 +127,10 @@ export class Player {
           if (shouldSkip()) continue
 
           // ─── Normal event execution ──────────────────────────────
-          let delay = event.delay / speed
+          let delay = event.delay / this.liveSpeed
 
-          if (humanize) {
-            delay = this.humanizer.randomizeDelay(delay, humanizeAmount)
+          if (this.liveHumanize) {
+            delay = this.humanizer.randomizeDelay(delay, this.liveHumanizeAmount)
           }
 
           if (delay > 0) {
@@ -126,7 +152,7 @@ export class Player {
           }
           if (!this.isPlaying) break
 
-          await this.executeEvent(sim, event, humanize, humanizeAmount)
+          await this.executeEvent(sim, event, this.liveHumanize, this.liveHumanizeAmount)
 
           onProgress({
             macroId: macro.id,
@@ -134,12 +160,12 @@ export class Player {
             currentEventIndex: i,
             currentRepeat: repeat + 1,
             totalRepeats: repeatCount,
-            elapsedMs: event.timestamp / speed
+            elapsedMs: event.timestamp / this.liveSpeed
           })
         }
 
         if (repeat < totalRepeats - 1 && repeatDelay > 0) {
-          await this.sleep(repeatDelay / speed)
+          await this.sleep(repeatDelay / this.liveSpeed)
         }
       }
     } catch (err) {

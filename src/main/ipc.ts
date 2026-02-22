@@ -241,6 +241,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   // Playback
   ipcMain.handle(IPC.PLAYBACK_START, async (_e, macroId: string) => {
     try {
+      // Guard: don't interrupt chain playback with a direct play request
+      if (chainPlayer!.getIsPlaying()) {
+        return { success: false, error: 'Chain is currently playing' }
+      }
+
       const macro = await macroStorage!.load(macroId)
       if (!macro) return { success: false, error: 'Macro not found' }
 
@@ -435,7 +440,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         async (macroId: string) => macroStorage!.load(macroId),
         (state) => {
           mainWindow.webContents.send(IPC.CHAIN_PROGRESS, state)
-          if (state.status === 'idle') {
+          if (state.status === 'playing') {
+            // Keep overlay showing "playing" between macros in chain
+            updateOverlayStatus('playing')
+          } else if (state.status === 'idle') {
             mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
             updateOverlayStatus('idle')
           }
@@ -627,6 +635,15 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         await settingsStorage!.set(mergedSettings)
         setupHotkeys(mainWindow, mergedSettings)
         mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId: id, profileName: profile.name })
+
+        // Apply new playback settings mid-play if player is active
+        if (player!.getIsPlaying()) {
+          player!.updatePlaybackSettings({
+            speed: mergedSettings.playback.defaultSpeed,
+            humanize: mergedSettings.playback.defaultHumanize,
+            humanizeAmount: mergedSettings.playback.defaultHumanizeAmount
+          })
+        }
       }
       return { success: true }
     } catch (err) {
@@ -670,6 +687,13 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
   )
 
   triggerManager.on('trigger-fired', async (data: { triggerId: string; macroId: string; type: string }) => {
+    // Guard: don't fire triggers while player or chain is already playing.
+    // This prevents pixel color triggers from re-firing every poll cycle
+    // and from interrupting chain playback.
+    if (player!.getIsPlaying() || chainPlayer!.getIsPlaying()) {
+      return
+    }
+
     mainWindow.webContents.send(IPC.TRIGGER_FIRED, data)
     // Auto-play the macro
     try {
@@ -727,9 +751,22 @@ function startProfileSwitcher(mainWindow: BrowserWindow, settings: AppSettings):
     try {
       const profile = await profileStorage!.activate(profileId)
       if (profile) {
-        await settingsStorage!.set(profile.settings)
-        setupHotkeys(mainWindow, profile.settings)
+        // Preserve profileRules from current settings — rules are global,
+        // not per-profile, so auto-switching should never erase them.
+        const currentSettings = await settingsStorage!.get()
+        const mergedSettings = { ...profile.settings, profileRules: currentSettings.profileRules }
+        await settingsStorage!.set(mergedSettings)
+        setupHotkeys(mainWindow, mergedSettings)
         mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId, profileName: profile.name })
+
+        // Apply new playback settings mid-play if player is active
+        if (player!.getIsPlaying()) {
+          player!.updatePlaybackSettings({
+            speed: mergedSettings.playback.defaultSpeed,
+            humanize: mergedSettings.playback.defaultHumanize,
+            humanizeAmount: mergedSettings.playback.defaultHumanizeAmount
+          })
+        }
       }
     } catch (err) {
       console.error('Profile auto-switch error:', err)

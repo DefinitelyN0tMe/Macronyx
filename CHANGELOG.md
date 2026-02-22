@@ -5,6 +5,18 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-02-22 — "Playback Stability"
+
+### Added
+- **Live playback settings** — profile auto-switch and manual profile activation now apply speed, humanize, and humanize amount changes immediately to the currently playing macro (no need to restart playback)
+
+### Fixed
+- **Pixel color trigger re-firing continuously** — pixel color triggers fired every polling cycle (1s) while the pixel matched, restarting playback every second and never completing the macro. Trigger-fired handler now checks if player or chain is already playing and silently skips — the trigger only fires again after the current playback finishes
+- **Chain playback interrupted by triggers** — pixel color and other triggers could interrupt chain playback by calling `player.play()` directly, which stopped the current chain macro and caused state corruption. Both trigger-fired handler and PLAYBACK_START now reject play requests when a chain is active
+- **Overlay widget idle during chain playback** — between macros in a chain, the overlay briefly showed "Idle" because the chain progress callback only updated overlay on idle. Now sends 'playing' status between chain steps to keep the overlay correct
+- **F11 double-press in chain editor** — used React state (`isPlaying`) for the guard which could be stale during rapid keypresses. Replaced with a ref-based guard (`isPlayingRef`) that updates synchronously, eliminating the race condition
+- **Profile auto-switch erased profile rules** — the `onSwitch` callback in profile auto-switcher overwrote settings without preserving global `profileRules`, erasing all auto-switch rules on first auto-switch. Now preserves rules the same way manual profile activation does
+
 ## [1.3.2] - 2026-02-22 — "Chain & Trigger Polish"
 
 ### Added
