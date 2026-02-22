@@ -12,11 +12,22 @@ const TRIGGER_TYPES: { value: TriggerType; label: string; icon: string }[] = [
 ]
 
 const SCHEDULE_EXAMPLES = [
+  { label: 'Every 1 min', value: '* * * * *' },
   { label: 'Every 5 min', value: '*/5 * * * *' },
+  { label: 'Every 10 min', value: '*/10 * * * *' },
+  { label: 'Every 15 min', value: '*/15 * * * *' },
+  { label: 'Every 30 min', value: '*/30 * * * *' },
   { label: 'Every hour', value: '0 * * * *' },
+  { label: 'Every 2 hours', value: '0 */2 * * *' },
+  { label: 'Every 6 hours', value: '0 */6 * * *' },
   { label: 'Daily 9:00', value: '0 9 * * *' },
+  { label: 'Daily 12:00', value: '0 12 * * *' },
+  { label: 'Daily 18:00', value: '0 18 * * *' },
   { label: 'Mon-Fri 8:30', value: '30 8 * * 1-5' },
-  { label: 'Every 15 min', value: '*/15 * * * *' }
+  { label: 'Mon-Fri 17:00', value: '0 17 * * 1-5' },
+  { label: 'Weekends 10:00', value: '0 10 * * 0,6' },
+  { label: 'Every Mon 9:00', value: '0 9 * * 1' },
+  { label: '1st of month', value: '0 0 1 * *' }
 ]
 
 export function TriggerPanel(): JSX.Element {
@@ -496,8 +507,30 @@ function PixelColorEditor({
           style={{ ...inputStyle, width: 50 }}
         />
       </div>
+      {/* Repeat while match checkbox */}
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 12,
+          color: 'var(--text-primary)',
+          cursor: 'pointer',
+          padding: '4px 0'
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={trigger.repeatWhileMatch ?? false}
+          onChange={(e) => onUpdate({ repeatWhileMatch: e.target.checked })}
+          style={{ cursor: 'pointer', accentColor: 'var(--accent-cyan)' }}
+        />
+        Repeat while pixel matches
+      </label>
       <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-        Fires when pixel at (X,Y) matches the target color within tolerance (0-255, lower = stricter). Polled every 1s.
+        {trigger.repeatWhileMatch
+          ? 'Macro will re-play each time it finishes while the pixel still matches. Polled every 1s.'
+          : 'Macro plays once when pixel matches. Won\'t re-fire until the pixel stops matching and matches again. Polled every 1s.'}
       </div>
     </div>
   )

@@ -5,6 +5,18 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-02-22 — "Trigger & Polish"
+
+### Added
+- **Pixel color trigger repeat mode** — new checkbox "Repeat while pixel matches" lets users choose between one-shot (fire once, wait for pixel to change and match again) or continuous repeat (re-fire after each playback completes while pixel still matches)
+- **Schedule trigger presets** — expanded from 5 to 16 quick-fill buttons covering common intervals (1/5/10/15/30 min, 1/2/6 hours, daily times, weekdays, weekends, weekly, monthly)
+- **Profile button animations** — Activate and Update buttons now show visual feedback with color flash, scale animation, and confirmation text ("Activated!" / "Updated!") on click
+
+### Fixed
+- **F11 double-play on Chains page** — pressing F11 on the Chains page fired both the chain player AND the global single-macro player simultaneously, causing double sound effects and playback glitching. AppShell's global hotkey handler now skips `playStart`/`playStop` when the active view is `chains`
+- **Relative positioning not working** — three root causes: (1) case-sensitive process name comparison failed when casing differed between recording and playback, (2) cached active window returned Macronyx itself after user clicked Play instead of the target app, (3) no fallback matching. Fixed with case-insensitive comparison, forced fresh poll via `pollOnce()` when cached window doesn't match, and title-based fallback matching
+- **Pixel color trigger fired every poll cycle** — one-shot pixel triggers now track their fired state and only re-fire after the pixel stops matching and matches again (unless repeat mode is enabled)
+
 ## [1.3.3] - 2026-02-22 — "Playback Stability"
 
 ### Added

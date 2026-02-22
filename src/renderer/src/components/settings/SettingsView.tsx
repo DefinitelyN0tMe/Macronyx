@@ -450,8 +450,8 @@ function AdvancedSettings(): JSX.Element {
 
   return (
     <>
-      <SettingRow label="Version" description="Macronyx v1.3.3">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.3</span>
+      <SettingRow label="Version" description="Macronyx v1.3.4">
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.4</span>
       </SettingRow>
       <SettingRow
         label="Portable Mode"
@@ -529,6 +529,8 @@ function ProfileSettings({
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  /** Track which button was just clicked for flash animation: "activate:id" or "update:id" */
+  const [flashingBtn, setFlashingBtn] = useState<string | null>(null)
 
   const loadProfiles = useCallback(async () => {
     try {
@@ -559,10 +561,12 @@ function ProfileSettings({
   }
 
   const handleActivate = async (id: string): Promise<void> => {
+    setFlashingBtn(`activate:${id}`)
     await window.api.activateProfile(id)
     // Reload settings in the store so the UI reflects the new profile's settings
     await useSettingsStore.getState().loadSettings()
     await loadProfiles()
+    setTimeout(() => setFlashingBtn(null), 600)
   }
 
   const handleRename = async (profile: Profile): Promise<void> => {
@@ -580,11 +584,13 @@ function ProfileSettings({
   }
 
   const handleUpdateFromCurrent = async (profile: Profile): Promise<void> => {
+    setFlashingBtn(`update:${profile.id}`)
     await window.api.saveProfile({
       ...profile,
       settings: { ...settings }
     })
     await loadProfiles()
+    setTimeout(() => setFlashingBtn(null), 600)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -744,14 +750,25 @@ function ProfileSettings({
                       border: 'none',
                       borderRadius: 6,
                       padding: '4px 10px',
-                      background: 'rgba(6, 182, 212, 0.15)',
-                      color: 'var(--accent-cyan)',
+                      background:
+                        flashingBtn === `activate:${profile.id}`
+                          ? 'var(--accent-cyan)'
+                          : 'rgba(6, 182, 212, 0.15)',
+                      color:
+                        flashingBtn === `activate:${profile.id}`
+                          ? '#000'
+                          : 'var(--accent-cyan)',
                       cursor: 'pointer',
                       fontSize: 11,
-                      fontWeight: 600
+                      fontWeight: 600,
+                      transition: 'all 0.2s ease',
+                      transform:
+                        flashingBtn === `activate:${profile.id}`
+                          ? 'scale(1.1)'
+                          : 'scale(1)'
                     }}
                   >
-                    Activate
+                    {flashingBtn === `activate:${profile.id}` ? 'Activated!' : 'Activate'}
                   </button>
                 )}
 
@@ -762,14 +779,25 @@ function ProfileSettings({
                     border: 'none',
                     borderRadius: 6,
                     padding: '4px 10px',
-                    background: 'rgba(139, 92, 246, 0.15)',
-                    color: '#8b5cf6',
+                    background:
+                      flashingBtn === `update:${profile.id}`
+                        ? '#8b5cf6'
+                        : 'rgba(139, 92, 246, 0.15)',
+                    color:
+                      flashingBtn === `update:${profile.id}`
+                        ? '#fff'
+                        : '#8b5cf6',
                     cursor: 'pointer',
                     fontSize: 11,
-                    fontWeight: 600
+                    fontWeight: 600,
+                    transition: 'all 0.2s ease',
+                    transform:
+                      flashingBtn === `update:${profile.id}`
+                        ? 'scale(1.1)'
+                        : 'scale(1)'
                   }}
                 >
-                  Update
+                  {flashingBtn === `update:${profile.id}` ? 'Updated!' : 'Update'}
                 </button>
 
                 <button

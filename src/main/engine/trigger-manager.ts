@@ -25,6 +25,9 @@ export class TriggerManager extends EventEmitter {
   private pixelInterval: ReturnType<typeof setInterval> | null = null
   private windowTriggers: TriggerConfig[] = []
   private running = false
+  /** Tracks pixel triggers that have already fired and are waiting for the pixel
+   *  to STOP matching before they can fire again (one-shot / non-repeat mode). */
+  private pixelFiredSet = new Set<string>()
 
   constructor(
     activeWindowService: ActiveWindowService,
@@ -139,6 +142,7 @@ export class TriggerManager extends EventEmitter {
 
     this.scheduleEntries = []
     this.windowTriggers = []
+    this.pixelFiredSet.clear()
   }
 
   private fireTrigger(trigger: TriggerConfig): void {
@@ -211,8 +215,19 @@ export class TriggerManager extends EventEmitter {
       const { x, y, color, tolerance } = trigger.pixelMatch
 
       const matches = await this.pixelSampler.matchesColor(x, y, color, tolerance)
+
       if (matches) {
+        // One-shot (default) vs repeat mode:
+        // - One-shot: fire once, then suppress until pixel stops matching and matches again
+        // - Repeat:   fire every poll cycle (guarded by ipc.ts playing check)
+        if (!trigger.repeatWhileMatch) {
+          if (this.pixelFiredSet.has(trigger.id)) continue // already fired, waiting for reset
+          this.pixelFiredSet.add(trigger.id)
+        }
         this.fireTrigger(trigger)
+      } else {
+        // Pixel no longer matches — reset one-shot flag so it can fire next time
+        this.pixelFiredSet.delete(trigger.id)
       }
     }
   }

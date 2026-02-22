@@ -98,6 +98,13 @@ export function AppShell(): JSX.Element {
           break
         }
         case 'playStart': {
+          // Skip single-macro play when user is on the Chains page —
+          // ChainEditor has its own playStart handler that plays the chain.
+          // Without this guard, F11 on Chains page fires BOTH chain play AND
+          // single macro play simultaneously, causing double sound + glitching.
+          const currentView = useAppStore.getState().activeView
+          if (currentView === 'chains') break
+
           if (currentStatus === 'idle') {
             const macros = useMacroStore.getState().macros
             const selectedId = useMacroStore.getState().selectedMacroId
@@ -109,6 +116,10 @@ export function AppShell(): JSX.Element {
           break
         }
         case 'playStop': {
+          // Skip when on Chains page — ChainEditor handles its own stop
+          const currentViewStop = useAppStore.getState().activeView
+          if (currentViewStop === 'chains') break
+
           if (currentStatus === 'playing' || currentStatus === 'paused') {
             await window.api.stopPlayback()
           }

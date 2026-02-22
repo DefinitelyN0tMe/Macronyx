@@ -222,16 +222,37 @@ export class Player {
     if (event.relativeToWindow) {
       try {
         const awService = getActiveWindowService()
-        const current = awService.getCurrent()
+        let current = awService.getCurrent()
+
+        // Case-insensitive process name comparison
+        const targetProcess = event.relativeToWindow.processName.toLowerCase()
+
+        // If cached window doesn't match (e.g. Macronyx is focused after clicking Play),
+        // force a fresh poll to get the actual foreground window
+        if (!current || !current.bounds || current.processName.toLowerCase() !== targetProcess) {
+          const fresh = await awService.pollOnce()
+          if (fresh) current = fresh
+        }
+
         if (current && current.bounds) {
-          // Try to match by process name first
-          if (current.processName === event.relativeToWindow.processName) {
+          // Match by process name (case-insensitive)
+          if (current.processName.toLowerCase() === targetProcess) {
+            x = current.bounds.x + event.relativeToWindow.offsetX
+            y = current.bounds.y + event.relativeToWindow.offsetY
+          } else if (
+            // Fallback: match by title prefix (case-insensitive) for apps that report
+            // different process names between recording and playback
+            event.relativeToWindow.title &&
+            current.title.toLowerCase().includes(
+              event.relativeToWindow.title.toLowerCase().slice(0, 20)
+            )
+          ) {
             x = current.bounds.x + event.relativeToWindow.offsetX
             y = current.bounds.y + event.relativeToWindow.offsetY
           } else {
             // Fallback: use absolute coords
             console.warn(
-              `Relative positioning: expected ${event.relativeToWindow.processName}, got ${current.processName}. Using absolute coords.`
+              `Relative positioning: expected "${event.relativeToWindow.processName}", got "${current.processName}". Using absolute coords.`
             )
           }
         }

@@ -131,6 +131,10 @@ export interface TriggerConfig {
     color: { r: number; g: number; b: number }
     tolerance: number // 0-255
   }
+  /** Pixel color repeat mode: true = re-fire after each playback while pixel matches,
+   *  false = fire once, don't re-fire until pixel stops matching then matches again.
+   *  Default: false (fire once) */
+  repeatWhileMatch?: boolean
 }
 
 // ─── Profile Auto-Switch ───────────────────────────────────────────────
