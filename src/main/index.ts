@@ -39,11 +39,18 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Handle minimizeToTray: intercept window close and hide instead
+  // Handle minimizeToTray: intercept window close and hide instead.
+  // When minimizeToTray is OFF, quit the whole app so the overlay
+  // window doesn't keep the process alive in the background.
   mainWindow.on('close', (event) => {
-    if (!appState.isQuitting && appState.minimizeToTray) {
+    if (appState.isQuitting) return
+    if (appState.minimizeToTray) {
       event.preventDefault()
       mainWindow?.hide()
+    } else {
+      // User wants a full exit — trigger app.quit() so before-quit
+      // fires and cleans up tray, overlay, and IPC properly.
+      app.quit()
     }
   })
 

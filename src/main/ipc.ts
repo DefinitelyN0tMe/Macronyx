@@ -501,7 +501,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         async (macroId: string) => macroStorage!.load(macroId),
         (state) => {
           safeSend(mainWindow, IPC.CHAIN_PROGRESS, state)
-          if (state.status === 'playing') {
+          if (state.status === 'playing' && !playbackPaused) {
             // Keep overlay showing "playing" between macros in chain
             updateOverlayStatus('playing')
           } else if (state.status === 'idle') {
@@ -512,7 +512,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         pbSettings,
         // Per-macro progress callback — keeps overlay widget updated during chain playback
         (macroState) => {
-          if (macroState.status === 'playing') {
+          if (macroState.status === 'playing' && !playbackPaused) {
             updateOverlayStatus('playing', macroState.elapsedMs)
           }
         }
@@ -524,6 +524,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.CHAIN_STOP, async () => {
+    playbackPaused = false
     chainPlayer!.stop()
     safeSend(mainWindow, IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
@@ -605,27 +606,40 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.SETTINGS_SET, async (_e, settings: Partial<AppSettings>) => {
     try {
       const updated = await settingsStorage!.set(settings)
-      // Re-register hotkeys when settings change
-      setupHotkeys(mainWindow, updated)
-      // Update minimize-to-tray behavior in shared state
-      appState.minimizeToTray = updated.general.minimizeToTray
-      // Update overlay widget enabled state
-      setOverlayEnabled(updated.general.showOverlayWidget !== false)
 
-      // Start/stop trigger manager based on setting
-      if (updated.general.enableTriggers) {
-        await startTriggerManager(mainWindow)
-      } else if (triggerManager) {
-        triggerManager.stop()
-        triggerManager = null
+      // Side effects are wrapped individually so a failure in any one
+      // does NOT prevent the settings save from returning success.
+      // (Previously, setupHotkeys throwing would cause { success: false }
+      // even though settingsStorage.set() had already persisted the change.)
+      try {
+        setupHotkeys(mainWindow, updated)
+      } catch (e) {
+        console.error('setupHotkeys failed after settings update:', e)
       }
 
-      // Start/stop profile auto-switch
-      if (updated.general.autoSwitchProfiles) {
-        startProfileSwitcher(mainWindow, updated)
-      } else if (profileSwitcher) {
-        profileSwitcher.stop()
-        profileSwitcher = null
+      appState.minimizeToTray = updated.general.minimizeToTray
+      setOverlayEnabled(updated.general.showOverlayWidget !== false)
+
+      try {
+        if (updated.general.enableTriggers) {
+          await startTriggerManager(mainWindow)
+        } else if (triggerManager) {
+          triggerManager.stop()
+          triggerManager = null
+        }
+      } catch (e) {
+        console.error('Trigger manager update failed:', e)
+      }
+
+      try {
+        if (updated.general.autoSwitchProfiles) {
+          startProfileSwitcher(mainWindow, updated)
+        } else if (profileSwitcher) {
+          profileSwitcher.stop()
+          profileSwitcher = null
+        }
+      } catch (e) {
+        console.error('Profile switcher update failed:', e)
       }
 
       return { success: true, settings: updated }
