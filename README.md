@@ -34,6 +34,8 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
 - Configurable delay between loop iterations
 - Pause/resume playback
 - Humanization mode — adds natural variance to timing and positions
+- **Natural mouse curves** — bezier-based mouse movement with configurable curvature, overshoot, and speed profile (constant/ease-in-out/natural) for realistic cursor paths
+- **Playback results** — per-event success/failed/skipped tracking with live overlay counter, timeline indicator dots, and post-playback summary panel
 - DPI-aware playback — pixel-perfect cursor positioning on any display scaling
 
 ### Timeline Editor
@@ -63,6 +65,7 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
   - Supports nesting (IF inside IF)
 - **Macro chaining** — run macros in sequence (A → B → C) with configurable delays between steps; drag-to-reorder, per-step enable/disable
 - **Relative positioning** — record mouse coordinates relative to the active window so macros adapt when windows move or resize
+- **Window-aware smart scaling** — mouse coordinates are proportionally scaled when the target window changes size since recording
 - **Playback preview** — animated cursor visualization on the mouse path canvas without moving the real cursor
 
 ### Profiles

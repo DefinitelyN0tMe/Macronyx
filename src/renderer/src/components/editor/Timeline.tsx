@@ -11,7 +11,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import { getEventTypeColor } from '../../utils/eventHelpers'
 import { stringToColor } from '../../utils/eventHelpers'
 import { getKeyLabel } from '../../utils/keyLabels'
-import type { MacroEvent } from '@shared/types'
+import type { MacroEvent, EventResultStatus } from '@shared/types'
 
 export function Timeline(): JSX.Element {
   const macro = useEditorStore((s) => s.macro)
@@ -26,9 +26,29 @@ export function Timeline(): JSX.Element {
   const moveEvent = useEditorStore((s) => s.moveEvent)
   const copyEvents = useEditorStore((s) => s.copyEvents)
   const pasteEvents = useEditorStore((s) => s.pasteEvents)
+  const playbackResults = useEditorStore((s) => s.playbackResults)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(2000)
   const lastSelectedRef = useRef<string | null>(null)
+
+  // Build a map from eventIndex to result status for quick lookup
+  const resultMap = useMemo(() => {
+    const map = new Map<number, EventResultStatus>()
+    for (const r of playbackResults) {
+      map.set(r.eventIndex, r.status)
+    }
+    return map
+  }, [playbackResults])
+
+  // Pre-compute event-id → index map for O(1) lookup (avoids O(n) indexOf per chip)
+  const eventIndexMap = useMemo(() => {
+    if (!macro) return new Map<string, number>()
+    const map = new Map<string, number>()
+    for (let i = 0; i < macro.events.length; i++) {
+      map.set(macro.events[i].id, i)
+    }
+    return map
+  }, [macro])
 
   // Track container width for viewport culling
   useEffect(() => {
@@ -213,6 +233,7 @@ export function Timeline(): JSX.Element {
                 isSelected={selectedEventIds.includes(event.id)}
                 onSelect={handleSelect}
                 viewportWidth={containerWidth}
+                resultStatus={resultMap.get(eventIndexMap.get(event.id) ?? -1)}
               />
             ))}
           </div>
@@ -244,6 +265,7 @@ export function Timeline(): JSX.Element {
                 isSelected={selectedEventIds.includes(event.id)}
                 onSelect={handleSelect}
                 viewportWidth={containerWidth}
+                resultStatus={resultMap.get(eventIndexMap.get(event.id) ?? -1)}
               />
             ))}
           </div>
@@ -263,6 +285,7 @@ export function Timeline(): JSX.Element {
                   isSelected={selectedEventIds.includes(event.id)}
                   onSelect={handleSelect}
                   viewportWidth={containerWidth}
+                  resultStatus={resultMap.get(eventIndexMap.get(event.id) ?? -1)}
                 />
               ))}
             </div>
@@ -319,7 +342,8 @@ function TimelineEventChip({
   scrollOffset,
   isSelected,
   onSelect,
-  viewportWidth
+  viewportWidth,
+  resultStatus
 }: {
   event: MacroEvent
   zoom: number
@@ -327,6 +351,7 @@ function TimelineEventChip({
   isSelected: boolean
   onSelect: (eventId: string, e: React.MouseEvent) => void
   viewportWidth: number
+  resultStatus?: EventResultStatus
 }): JSX.Element {
   const baseLeft = (event.timestamp / 1000) * zoom - scrollOffset
   const color = getEventTypeColor(event.type)
@@ -464,6 +489,28 @@ function TimelineEventChip({
       {...attributes}
     >
       {renderContent()}
+      {/* Playback result indicator (v1.4) */}
+      {resultStatus && resultStatus !== 'pending' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -3,
+            right: -3,
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background:
+              resultStatus === 'success'
+                ? '#22c55e'
+                : resultStatus === 'failed'
+                  ? '#ef4444'
+                  : '#6b7280',
+            border: '1px solid var(--bg-primary)',
+            zIndex: 10
+          }}
+          title={resultStatus}
+        />
+      )}
     </div>
   )
 }

@@ -73,16 +73,30 @@ export function MousePathPreview(): JSX.Element {
 
     const { scale, offsetX, offsetY } = getScaling(width, height)
 
-    // Draw path
+    // Draw path using smooth bezier curves
     const moves = mouseEvents.filter((e) => e.type === 'mouse_move')
     if (moves.length > 1) {
       ctx.strokeStyle = 'rgba(6, 182, 212, 0.25)'
       ctx.lineWidth = 1.5
       ctx.beginPath()
-      ctx.moveTo((moves[0].x ?? 0) * scale + offsetX, (moves[0].y ?? 0) * scale + offsetY)
+      const sx = (moves[0].x ?? 0) * scale + offsetX
+      const sy = (moves[0].y ?? 0) * scale + offsetY
+      ctx.moveTo(sx, sy)
       for (let i = 1; i < moves.length; i++) {
-        ctx.lineTo((moves[i].x ?? 0) * scale + offsetX, (moves[i].y ?? 0) * scale + offsetY)
+        const prev = moves[i - 1]
+        const cur = moves[i]
+        const px = (prev.x ?? 0) * scale + offsetX
+        const py = (prev.y ?? 0) * scale + offsetY
+        const cx = (cur.x ?? 0) * scale + offsetX
+        const cy = (cur.y ?? 0) * scale + offsetY
+        // Use quadratic bezier with midpoint control for smoother curves
+        const cpx = (px + cx) / 2
+        const cpy = (py + cy) / 2
+        ctx.quadraticCurveTo(px, py, cpx, cpy)
       }
+      // Draw final segment to the last point
+      const last = moves[moves.length - 1]
+      ctx.lineTo((last.x ?? 0) * scale + offsetX, (last.y ?? 0) * scale + offsetY)
       ctx.stroke()
     }
 
@@ -158,7 +172,7 @@ export function MousePathPreview(): JSX.Element {
         }
       }
 
-      // Draw trail of past mouse moves (fading gradient)
+      // Draw trail of past mouse moves (fading gradient with smooth curves)
       const pastMoves = macro.events.filter(
         (e, i) => (e.type === 'mouse_move' || e.type === 'mouse_click') && i <= currentIdx
       )
@@ -167,20 +181,21 @@ export function MousePathPreview(): JSX.Element {
           const progress = i / pastMoves.length
           ctx.strokeStyle = `rgba(6, 182, 212, ${0.1 + progress * 0.4})`
           ctx.lineWidth = 1 + progress
+          const px = (pastMoves[i - 1].x ?? 0) * scale + offsetX
+          const py = (pastMoves[i - 1].y ?? 0) * scale + offsetY
+          const cx = (pastMoves[i].x ?? 0) * scale + offsetX
+          const cy = (pastMoves[i].y ?? 0) * scale + offsetY
+          const cpx = (px + cx) / 2
+          const cpy = (py + cy) / 2
           ctx.beginPath()
-          ctx.moveTo(
-            (pastMoves[i - 1].x ?? 0) * scale + offsetX,
-            (pastMoves[i - 1].y ?? 0) * scale + offsetY
-          )
-          ctx.lineTo(
-            (pastMoves[i].x ?? 0) * scale + offsetX,
-            (pastMoves[i].y ?? 0) * scale + offsetY
-          )
+          ctx.moveTo(px, py)
+          ctx.quadraticCurveTo(px, py, cpx, cpy)
+          ctx.lineTo(cx, cy)
           ctx.stroke()
         }
       }
 
-      // Draw future path dimmed
+      // Draw future path dimmed with smooth curves
       const futureMoves = macro.events.filter(
         (e, i) => (e.type === 'mouse_move' || e.type === 'mouse_click') && i > currentIdx
       )
@@ -190,9 +205,27 @@ export function MousePathPreview(): JSX.Element {
         const lastPast = pastMoves[pastMoves.length - 1]
         ctx.beginPath()
         ctx.moveTo((lastPast.x ?? 0) * scale + offsetX, (lastPast.y ?? 0) * scale + offsetY)
-        for (const e of futureMoves) {
-          ctx.lineTo((e.x ?? 0) * scale + offsetX, (e.y ?? 0) * scale + offsetY)
+        for (let i = 0; i < futureMoves.length; i++) {
+          if (i === 0) {
+            const prev = lastPast
+            const cur = futureMoves[i]
+            const px = (prev.x ?? 0) * scale + offsetX
+            const py = (prev.y ?? 0) * scale + offsetY
+            const cx = (cur.x ?? 0) * scale + offsetX
+            const cy = (cur.y ?? 0) * scale + offsetY
+            ctx.quadraticCurveTo(px, py, (px + cx) / 2, (py + cy) / 2)
+          } else {
+            const prev = futureMoves[i - 1]
+            const cur = futureMoves[i]
+            const px = (prev.x ?? 0) * scale + offsetX
+            const py = (prev.y ?? 0) * scale + offsetY
+            const cx = (cur.x ?? 0) * scale + offsetX
+            const cy = (cur.y ?? 0) * scale + offsetY
+            ctx.quadraticCurveTo(px, py, (px + cx) / 2, (py + cy) / 2)
+          }
         }
+        const last = futureMoves[futureMoves.length - 1]
+        ctx.lineTo((last.x ?? 0) * scale + offsetX, (last.y ?? 0) * scale + offsetY)
         ctx.stroke()
       }
 

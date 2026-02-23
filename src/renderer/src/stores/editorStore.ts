@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { v4 as uuid } from 'uuid'
-import type { Macro, MacroEvent } from '@shared/types'
+import type { Macro, MacroEvent, EventResult, PlaybackReport, MouseCurveSettings } from '@shared/types'
 
 interface HistoryEntry {
   events: MacroEvent[]
@@ -26,6 +26,10 @@ interface EditorState {
   history: HistoryEntry[]
   historyIndex: number
 
+  // Playback results (v1.4)
+  playbackResults: EventResult[]
+  playbackReport: PlaybackReport | null
+
   loadMacro: (macro: Macro) => void
   renameMacro: (name: string) => void
   updateMacroDescription: (description: string) => void
@@ -47,6 +51,10 @@ interface EditorState {
   setZoom: (zoom: number) => void
   setScrollOffset: (offset: number) => void
   setPlayheadMs: (ms: number) => void
+  updateMouseCurve: (curve: MouseCurveSettings) => void
+  addPlaybackResult: (result: EventResult) => void
+  setPlaybackReport: (report: PlaybackReport | null) => void
+  clearPlaybackResults: () => void
   undo: () => void
   redo: () => void
   saveMacro: () => Promise<void>
@@ -91,6 +99,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipboard: [],
   history: [],
   historyIndex: -1,
+  playbackResults: [],
+  playbackReport: null,
 
   loadMacro: (macro) => {
     set({
@@ -335,6 +345,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedEventIds: [condStart.id]
     })
   },
+
+  updateMouseCurve: (curve) => {
+    const { macro } = get()
+    if (!macro) return
+    set({
+      macro: {
+        ...macro,
+        playbackSettings: { ...macro.playbackSettings, mouseCurve: curve }
+      },
+      isDirty: true
+    })
+  },
+
+  addPlaybackResult: (result) => {
+    set((state) => ({ playbackResults: [...state.playbackResults, result] }))
+  },
+  setPlaybackReport: (report) => set({ playbackReport: report }),
+  clearPlaybackResults: () => set({ playbackResults: [], playbackReport: null }),
 
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),
   setScrollOffset: (offset) => set({ scrollOffset: Math.max(0, offset) }),

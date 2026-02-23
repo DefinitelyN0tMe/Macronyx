@@ -1,5 +1,10 @@
-import type { Macro, MacroEvent, PlaybackState, ConditionConfig } from '../../shared/types'
+import type {
+  Macro, MacroEvent, PlaybackState, ConditionConfig,
+  EventResult, EventResultStatus, PlaybackReport, MouseCurveSettings
+} from '../../shared/types'
+import { DEFAULT_MOUSE_CURVE } from '../../shared/constants'
 import { Humanizer } from './humanizer'
+import { MouseCurveGenerator } from './mouse-curve'
 import { mapKeyCode } from './keymap'
 import { getInputSimulator, destroyInputSimulator } from './input-simulator'
 import { getActiveWindowService } from './active-window'
@@ -17,11 +22,22 @@ export class Player {
   private liveSpeed = 1
   private liveHumanize = false
   private liveHumanizeAmount = 10
+  private liveMouseCurve: MouseCurveSettings = { ...DEFAULT_MOUSE_CURVE }
+
+  // Track last mouse position for curve generation
+  private lastMousePos: { x: number; y: number } | null = null
 
   // Relative positioning cache — avoids querying PowerShell for every single event.
   // Populated once before playback starts, refreshed every 500ms during playback.
-  private windowBoundsCache = new Map<string, { x: number; y: number; updatedAt: number }>()
+  // Includes width/height for proportional scaling (v1.4).
+  private windowBoundsCache = new Map<string, {
+    x: number; y: number; width: number; height: number; updatedAt: number
+  }>()
   private static readonly WINDOW_CACHE_TTL = 500 // ms
+
+  // Event result tracking (v1.4)
+  private eventResults: EventResult[] = []
+  private onEventResult?: (result: EventResult) => void
 
   /** Check if player is currently playing */
   getIsPlaying(): boolean {
@@ -39,7 +55,12 @@ export class Player {
     if (settings.humanizeAmount !== undefined) this.liveHumanizeAmount = settings.humanizeAmount
   }
 
-  async play(macro: Macro, onProgress: (state: PlaybackState) => void): Promise<void> {
+  async play(
+    macro: Macro,
+    onProgress: (state: PlaybackState) => void,
+    onEventResult?: (result: EventResult) => void,
+    onPlaybackReport?: (report: PlaybackReport) => void
+  ): Promise<void> {
     // Guard against concurrent plays
     if (this.isPlaying) {
       this.stop()
@@ -48,6 +69,7 @@ export class Player {
     this.isPlaying = true
     this.isPaused = false
     this.onProgress = onProgress
+    this.onEventResult = onEventResult
 
     const { repeatCount, repeatDelay } = macro.playbackSettings
     const totalRepeats = repeatCount === 0 ? Infinity : repeatCount
@@ -56,12 +78,17 @@ export class Player {
     this.liveSpeed = macro.playbackSettings.speed
     this.liveHumanize = macro.playbackSettings.humanize
     this.liveHumanizeAmount = macro.playbackSettings.humanizeAmount
+    this.liveMouseCurve = macro.playbackSettings.mouseCurve ?? { ...DEFAULT_MOUSE_CURVE }
 
     // Get the input simulator (singleton, stays alive between plays)
     const sim = getInputSimulator()
     this.activeSim = sim
     this.heldKeys.clear()
     this.windowBoundsCache.clear()
+    this.eventResults = []
+    this.lastMousePos = null
+
+    const playbackStartedAt = Date.now()
 
     // Pre-populate window bounds cache so the first events resolve instantly
     await this.warmWindowCache(macro.events)
@@ -71,15 +98,12 @@ export class Player {
         if (!this.isPlaying) break
 
         // Condition evaluation state: stack for nested conditionals.
-        // Each entry tracks whether its branch is currently skipping,
-        // and whether the entire block is inside a skipped outer branch.
         const condStack: {
           pairId: string
-          branchSkipping: boolean // true = currently in a skipped branch at THIS level
-          outerSkipped: boolean   // true = entire block is inside a skipped outer
+          branchSkipping: boolean
+          outerSkipped: boolean
         }[] = []
 
-        /** Returns true if events should be skipped based on the condition stack */
         const shouldSkip = (): boolean => {
           for (const entry of condStack) {
             if (entry.outerSkipped || entry.branchSkipping) return true
@@ -101,14 +125,12 @@ export class Player {
           if (event.type === 'condition_start') {
             const pairId = event.conditionPairId || ''
             if (shouldSkip()) {
-              // Inside a skipped outer branch — don't evaluate, skip entire nested block
               condStack.push({ pairId, branchSkipping: true, outerSkipped: true })
             } else {
               const result = await this.evaluateCondition(event.condition)
-              // true → execute true branch (branchSkipping=false)
-              // false → skip true branch (branchSkipping=true)
               condStack.push({ pairId, branchSkipping: !result, outerSkipped: false })
             }
+            this.recordResult(i, 'success')
             continue
           }
 
@@ -116,11 +138,10 @@ export class Player {
             const top = condStack[condStack.length - 1]
             if (top && top.pairId === event.conditionPairId) {
               if (!top.outerSkipped) {
-                // Flip: was executing → now skip, was skipping → now execute
                 top.branchSkipping = !top.branchSkipping
               }
-              // If outerSkipped, keep skipping the entire block
             }
+            this.recordResult(i, 'success')
             continue
           }
 
@@ -129,11 +150,15 @@ export class Player {
             if (top && top.pairId === event.conditionPairId) {
               condStack.pop()
             }
+            this.recordResult(i, 'success')
             continue
           }
 
           // Skip events if inside a false conditional branch
-          if (shouldSkip()) continue
+          if (shouldSkip()) {
+            this.recordResult(i, 'skipped')
+            continue
+          }
 
           // ─── Normal event execution ──────────────────────────────
           let delay = event.delay / this.liveSpeed
@@ -143,14 +168,12 @@ export class Player {
           }
 
           if (delay > 0) {
-            // For very small delays, use a tighter loop for accuracy
             if (delay < 5) {
               const start = performance.now()
               while (performance.now() - start < delay) {
                 // Busy wait for sub-5ms precision
               }
             } else if (delay > 100) {
-              // For long delays, sleep in chunks so pause/stop is responsive
               const deadline = Date.now() + delay
               while (Date.now() < deadline && this.isPlaying && !this.isPaused) {
                 await this.sleep(Math.min(50, deadline - Date.now()))
@@ -161,7 +184,10 @@ export class Player {
           }
           if (!this.isPlaying) break
 
-          await this.executeEvent(sim, event, this.liveHumanize, this.liveHumanizeAmount)
+          const eventStatus = await this.executeEvent(
+            sim, event, this.liveHumanize, this.liveHumanizeAmount
+          )
+          this.recordResult(i, eventStatus)
 
           onProgress({
             macroId: macro.id,
@@ -182,10 +208,26 @@ export class Player {
     }
 
     this.isPlaying = false
-    // Release any remaining held keys at end of playback
     this.releaseAllHeldKeys()
     this.heldKeys.clear()
     this.activeSim = null
+    this.lastMousePos = null
+
+    // Build and emit playback report
+    if (onPlaybackReport) {
+      const report: PlaybackReport = {
+        macroId: macro.id,
+        startedAt: playbackStartedAt,
+        finishedAt: Date.now(),
+        totalEvents: macro.events.length,
+        successCount: this.eventResults.filter((r) => r.status === 'success').length,
+        failedCount: this.eventResults.filter((r) => r.status === 'failed').length,
+        skippedCount: this.eventResults.filter((r) => r.status === 'skipped').length,
+        results: [...this.eventResults]
+      }
+      onPlaybackReport(report)
+    }
+
     onProgress({
       macroId: macro.id,
       status: 'idle',
@@ -200,18 +242,15 @@ export class Player {
     this.isPlaying = false
     this.isPaused = false
     this.windowBoundsCache.clear()
-    // Release any keys still held to prevent stuck keys
     this.releaseAllHeldKeys()
   }
 
   pause(): void {
     this.isPaused = true
-    // Release all currently held keys to prevent stuck modifiers
     this.releaseAllHeldKeys()
   }
 
   resume(): void {
-    // Restore all keys that were held before pause
     this.restoreHeldKeys()
     this.isPaused = false
   }
@@ -222,8 +261,14 @@ export class Player {
     destroyInputSimulator()
   }
 
-  /** Pre-populate the window bounds cache for all process names referenced in the macro.
-   *  Called once before playback starts so the first events don't need to wait. */
+  /** Record an event result and emit it */
+  private recordResult(eventIndex: number, status: EventResultStatus, error?: string): void {
+    const result: EventResult = { eventIndex, status, error, timestamp: Date.now() }
+    this.eventResults.push(result)
+    this.onEventResult?.(result)
+  }
+
+  /** Pre-populate the window bounds cache for all process names referenced in the macro. */
   private async warmWindowCache(events: MacroEvent[]): Promise<void> {
     const processNames = new Set<string>()
     for (const e of events) {
@@ -239,6 +284,8 @@ export class Player {
           this.windowBoundsCache.set(name, {
             x: info.bounds.x,
             y: info.bounds.y,
+            width: info.bounds.width,
+            height: info.bounds.height,
             updatedAt: Date.now()
           })
         }
@@ -261,6 +308,8 @@ export class Player {
         this.windowBoundsCache.set(key, {
           x: info.bounds.x,
           y: info.bounds.y,
+          width: info.bounds.width,
+          height: info.bounds.height,
           updatedAt: Date.now()
         })
       }
@@ -269,8 +318,8 @@ export class Player {
     }
   }
 
-  /** Resolve relative positioning — compute absolute coords from window-relative offsets.
-   *  Uses a local bounds cache (refreshed every 500ms) to avoid per-event PowerShell queries. */
+  /** Resolve relative positioning with proportional scaling (v1.4).
+   *  If the window changed size since recording, coordinates are scaled proportionally. */
   private async resolvePosition(
     event: MacroEvent
   ): Promise<{ x: number; y: number }> {
@@ -280,13 +329,25 @@ export class Player {
     if (event.relativeToWindow) {
       const key = event.relativeToWindow.processName.toLowerCase()
 
-      // Refresh cache if stale (non-blocking for fresh entries, ~20ms for stale)
       await this.refreshWindowBounds(event.relativeToWindow.processName)
 
       const cached = this.windowBoundsCache.get(key)
       if (cached) {
-        x = cached.x + event.relativeToWindow.offsetX
-        y = cached.y + event.relativeToWindow.offsetY
+        let offsetX = event.relativeToWindow.offsetX
+        let offsetY = event.relativeToWindow.offsetY
+
+        // Smart scaling: if recording stored window dimensions, scale proportionally
+        const recW = event.relativeToWindow.windowWidth
+        const recH = event.relativeToWindow.windowHeight
+        if (recW && recH && recW > 0 && recH > 0 && cached.width > 0 && cached.height > 0) {
+          const scaleX = cached.width / recW
+          const scaleY = cached.height / recH
+          offsetX = Math.round(offsetX * scaleX)
+          offsetY = Math.round(offsetY * scaleY)
+        }
+
+        x = cached.x + offsetX
+        y = cached.y + offsetY
       } else {
         console.warn(
           `Relative positioning: window "${event.relativeToWindow.processName}" not found. Using absolute coords.`
@@ -297,12 +358,58 @@ export class Player {
     return { x, y }
   }
 
+  /** Execute a mouse movement along a bezier curve (v1.4). */
+  private async executeCurveMovement(
+    sim: ReturnType<typeof getInputSimulator>,
+    targetX: number,
+    targetY: number
+  ): Promise<void> {
+    if (!this.lastMousePos || !this.liveMouseCurve.enabled) {
+      // No previous position or curves disabled — direct move
+      await sim.moveMouse(targetX, targetY)
+      this.lastMousePos = { x: targetX, y: targetY }
+      return
+    }
+
+    const start = this.lastMousePos
+    const dist = Math.sqrt(
+      Math.pow(targetX - start.x, 2) + Math.pow(targetY - start.y, 2)
+    )
+
+    // Skip curves for very short movements (<10px)
+    if (dist < 10) {
+      await sim.moveMouse(targetX, targetY)
+      this.lastMousePos = { x: targetX, y: targetY }
+      return
+    }
+
+    const points = MouseCurveGenerator.generateCurve(
+      start,
+      { x: targetX, y: targetY },
+      this.liveMouseCurve
+    )
+
+    // Distribute movement time based on distance
+    const totalTimeMs = Math.min(dist / 3, 60) / this.liveSpeed
+    const stepDelay = points.length > 1 ? totalTimeMs / (points.length - 1) : 0
+
+    for (let p = 0; p < points.length; p++) {
+      if (!this.isPlaying) break
+      await sim.moveMouse(Math.round(points[p].x), Math.round(points[p].y))
+      if (stepDelay > 1 && p < points.length - 1) {
+        await this.sleep(stepDelay)
+      }
+    }
+
+    this.lastMousePos = { x: targetX, y: targetY }
+  }
+
   private async executeEvent(
     sim: ReturnType<typeof getInputSimulator>,
     event: MacroEvent,
     humanize: boolean,
     amount: number
-  ): Promise<void> {
+  ): Promise<EventResultStatus> {
     try {
       switch (event.type) {
         case 'mouse_move': {
@@ -312,7 +419,7 @@ export class Player {
             x += offset.x
             y += offset.y
           }
-          await sim.moveMouse(x, y)
+          await this.executeCurveMovement(sim, x, y)
           break
         }
         case 'mouse_click': {
@@ -322,12 +429,18 @@ export class Player {
             x += offset.x
             y += offset.y
           }
-          // Atomic move+click — guarantees click at the correct position
-          await sim.moveAndClick(x, y, (event.button as 'left' | 'right' | 'middle') ?? 'left')
+          // If curves are enabled, move along curve first, then click
+          if (this.liveMouseCurve.enabled && this.lastMousePos) {
+            await this.executeCurveMovement(sim, x, y)
+            // Click at final position (already there from curve)
+            await sim.moveAndClick(x, y, (event.button as 'left' | 'right' | 'middle') ?? 'left')
+          } else {
+            await sim.moveAndClick(x, y, (event.button as 'left' | 'right' | 'middle') ?? 'left')
+            this.lastMousePos = { x, y }
+          }
           break
         }
         case 'mouse_up': {
-          // Mouse button release
           if (event.button) {
             await sim.mouseUp(event.button as 'left' | 'right' | 'middle')
           }
@@ -335,10 +448,10 @@ export class Player {
         }
         case 'mouse_scroll': {
           if (event.scrollDelta) {
-            // Move mouse to scroll position first
             if (event.x !== undefined && event.y !== undefined) {
               const { x, y } = await this.resolvePosition(event)
               await sim.moveMouse(x, y)
+              this.lastMousePos = { x, y }
             }
             await sim.mouseScroll(event.scrollDelta.y)
           }
@@ -366,8 +479,10 @@ export class Player {
         case 'condition_end':
           break
       }
+      return 'success'
     } catch (err) {
       console.error('Event execution error:', err)
+      return 'failed'
     }
   }
 
@@ -437,7 +552,6 @@ export class Player {
         // Best effort
       }
     }
-    // Don't clear heldKeys — we need them for restore on resume
   }
 
   /** Re-press all keys that were held before pause */

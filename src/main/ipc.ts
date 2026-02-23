@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { v4 as uuid } from 'uuid'
 import * as fs from 'fs'
 import { IPC } from '../shared/constants'
-import type { Macro, MacroEvent, AppSettings, PlaybackState, MacroChain } from '../shared/types'
+import type { Macro, MacroEvent, AppSettings, PlaybackState, MacroChain, EventResult, PlaybackReport } from '../shared/types'
 import { Recorder } from './engine/recorder'
 import { Player } from './engine/player'
 import { ChainPlayer } from './engine/chain-player'
@@ -18,7 +18,7 @@ import { destroyQueryProcess } from './engine/query-process'
 import { getPixelSampler } from './engine/pixel-sampler'
 import { appState } from './app-state'
 import { getPortableMarkerPath } from './utils/paths'
-import { updateOverlayStatus, setOverlayEnabled } from './overlay'
+import { updateOverlayStatus, updateOverlayResults, setOverlayEnabled } from './overlay'
 
 let recorder: Recorder | null = null
 let player: Player | null = null
@@ -35,6 +35,8 @@ let recordingStartTime = 0
 let recordingPausedAt = 0
 let recordingAccumulatedPause = 0
 let playbackPaused = false
+let playbackSuccessCount = 0
+let playbackFailedCount = 0
 
 /** Compute the correct recording elapsed time (excluding pauses) */
 function getRecordingElapsed(): number {
@@ -251,32 +253,46 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
       // Always apply the current global default playback settings so that
       // changes in Settings > Playback take effect immediately for all macros.
+      // Preserve per-macro settings like mouseCurve that aren't in global defaults.
       const currentSettings = await settingsStorage!.get()
       macro.playbackSettings = {
         speed: currentSettings.playback.defaultSpeed,
         repeatCount: currentSettings.playback.defaultRepeatCount,
         repeatDelay: currentSettings.playback.defaultRepeatDelay,
         humanize: currentSettings.playback.defaultHumanize,
-        humanizeAmount: currentSettings.playback.defaultHumanizeAmount
+        humanizeAmount: currentSettings.playback.defaultHumanizeAmount,
+        mouseCurve: macro.playbackSettings?.mouseCurve
       }
 
       const totalDuration = macro.duration / macro.playbackSettings.speed
       playbackPaused = false
+      playbackSuccessCount = 0
+      playbackFailedCount = 0
       mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
       updateOverlayStatus('playing', 0, totalDuration)
-      player!.play(macro, (state: PlaybackState) => {
-        mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
-        // Don't override overlay status while paused — player may fire one more
-        // progress callback after pause before entering the wait loop
-        if (!playbackPaused) {
-          updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs, totalDuration)
+      player!.play(
+        macro,
+        (state: PlaybackState) => {
+          mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
+          if (!playbackPaused) {
+            updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs, totalDuration)
+          }
+          if (state.status === 'idle') {
+            playbackPaused = false
+            mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+            updateOverlayStatus('idle')
+          }
+        },
+        (result: EventResult) => {
+          if (result.status === 'success') playbackSuccessCount++
+          else if (result.status === 'failed') playbackFailedCount++
+          updateOverlayResults(playbackSuccessCount, playbackFailedCount)
+          mainWindow.webContents.send(IPC.PLAYBACK_EVENT_RESULT, result)
+        },
+        (report: PlaybackReport) => {
+          mainWindow.webContents.send(IPC.PLAYBACK_REPORT, report)
         }
-        if (state.status === 'idle') {
-          playbackPaused = false
-          mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
-          updateOverlayStatus('idle')
-        }
-      })
+      )
       return { success: true }
     } catch (err) {
       return { success: false, error: String(err) }
@@ -705,17 +721,32 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
           repeatCount: currentSettings.playback.defaultRepeatCount,
           repeatDelay: currentSettings.playback.defaultRepeatDelay,
           humanize: currentSettings.playback.defaultHumanize,
-          humanizeAmount: currentSettings.playback.defaultHumanizeAmount
+          humanizeAmount: currentSettings.playback.defaultHumanizeAmount,
+          mouseCurve: macro.playbackSettings?.mouseCurve
         }
+        playbackSuccessCount = 0
+        playbackFailedCount = 0
         mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
         updateOverlayStatus('playing')
-        player!.play(macro, (state: PlaybackState) => {
-          mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
-          if (state.status === 'idle') {
-            mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
-            updateOverlayStatus('idle')
+        player!.play(
+          macro,
+          (state: PlaybackState) => {
+            mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
+            if (state.status === 'idle') {
+              mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+              updateOverlayStatus('idle')
+            }
+          },
+          (result: EventResult) => {
+            if (result.status === 'success') playbackSuccessCount++
+            else if (result.status === 'failed') playbackFailedCount++
+            updateOverlayResults(playbackSuccessCount, playbackFailedCount)
+            mainWindow.webContents.send(IPC.PLAYBACK_EVENT_RESULT, result)
+          },
+          (report: PlaybackReport) => {
+            mainWindow.webContents.send(IPC.PLAYBACK_REPORT, report)
           }
-        })
+        )
       }
     } catch (err) {
       console.error('Trigger playback error:', err)

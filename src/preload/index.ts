@@ -123,6 +123,22 @@ const api = {
     }
   },
 
+  // Playback results (v1.4)
+  onPlaybackEventResult: (callback: (data: unknown) => void) => {
+    const listener = (_: unknown, data: unknown): void => callback(data)
+    ipcRenderer.on(IPC.PLAYBACK_EVENT_RESULT, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.PLAYBACK_EVENT_RESULT, listener)
+    }
+  },
+  onPlaybackReport: (callback: (data: unknown) => void) => {
+    const listener = (_: unknown, data: unknown): void => callback(data)
+    ipcRenderer.on(IPC.PLAYBACK_REPORT, listener)
+    return () => {
+      ipcRenderer.removeListener(IPC.PLAYBACK_REPORT, listener)
+    }
+  },
+
   // Overlay widget
   onOverlayStatus: (callback: (data: unknown) => void) => {
     const listener = (_: unknown, data: unknown): void => callback(data)

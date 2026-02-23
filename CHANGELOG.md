@@ -5,6 +5,26 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-02-23 — "Smart Playback"
+
+### Added
+- **Window-Aware Smart Scaling** — mouse coordinates are now proportionally scaled when the target window changes size since recording. Extends relative positioning so macros adapt to resized windows, not just moved ones
+- **Success/Fail Visual Playback Markers** — each event during playback now gets a status (success/failed/skipped). Green/red/gray dots appear on timeline events after playback. Post-playback summary panel shows counts and duration. Overlay widget shows live success counter during playback
+- **Natural Mouse Curve Editor** — bezier-based mouse movement with configurable curvature, overshoot, and speed profile (constant/ease-in-out/natural). Replaces linear point-to-point movement for more human-like cursor paths. Per-macro setting via "Curves" button in editor toolbar
+- **Playback Report IPC** — new `playback:eventResult` and `playback:report` IPC channels for per-event results and post-playback reports
+- **PlaybackResultsPanel** — new component showing post-playback summary with pass/fail/skip counts and duration
+
+### Changed
+- Relative Positioning marked as **(Experimental)** in Settings UI — feature is functional but frozen for further development
+- MousePathPreview now renders smooth bezier curves instead of straight lines
+- Player tracks `lastMousePos` for curve generation between mouse events
+- Window bounds cache now stores width/height for proportional scaling
+- `executeEvent()` returns `EventResultStatus` for result tracking
+
+### Fixed
+- **Trigger-fired playback overlay counts accumulated** — overlay success/fail counter was not reset when a trigger started new playback, causing counts to accumulate across trigger-fired sessions. Now resets counters and tracks results per trigger playback
+- **Timeline render performance** — result status lookup used O(n) `indexOf` per event chip, causing O(n²) rendering for large macros. Replaced with pre-computed O(1) index map
+
 ## [1.3.5] - 2026-02-22 — "Relative Positioning Upgrade"
 
 ### Fixed

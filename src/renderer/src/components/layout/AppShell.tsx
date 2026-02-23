@@ -14,7 +14,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useEditorStore } from '../../stores/editorStore'
 import { useMacroStore } from '../../stores/macroStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import type { AppStatus, Macro } from '@shared/types'
+import type { AppStatus, Macro, EventResult, PlaybackReport } from '@shared/types'
 import {
   soundRecordStart,
   soundRecordStop,
@@ -60,6 +60,8 @@ export function AppShell(): JSX.Element {
         store.resetRecordingTimer()
         soundRecordStop()
       } else if (newStatus === 'playing' && prev === 'idle') {
+        // Clear previous playback results when starting new playback
+        useEditorStore.getState().clearPlaybackResults()
         soundPlayStart()
       } else if (newStatus === 'playing' && prev === 'paused') {
         soundResume()
@@ -70,6 +72,24 @@ export function AppShell(): JSX.Element {
       }
 
       store.setStatus(newStatus)
+    })
+    return unsub
+  }, [])
+
+  // Listen for per-event playback results (v1.4)
+  useEffect(() => {
+    const unsub = window.api.onPlaybackEventResult((raw) => {
+      const result = raw as EventResult
+      useEditorStore.getState().addPlaybackResult(result)
+    })
+    return unsub
+  }, [])
+
+  // Listen for playback report (v1.4)
+  useEffect(() => {
+    const unsub = window.api.onPlaybackReport((raw) => {
+      const report = raw as PlaybackReport
+      useEditorStore.getState().setPlaybackReport(report)
     })
     return unsub
   }, [])

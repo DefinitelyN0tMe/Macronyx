@@ -1,4 +1,4 @@
-import type { AppSettings } from './types'
+import type { AppSettings, MouseCurveSettings } from './types'
 
 export const IPC = {
   RECORDING_START: 'recording:start',
@@ -61,7 +61,11 @@ export const IPC = {
   PIXEL_PICK: 'pixel:pick',
 
   // Triggers
-  TRIGGER_FIRED: 'trigger:fired'
+  TRIGGER_FIRED: 'trigger:fired',
+
+  // Playback results (v1.4)
+  PLAYBACK_EVENT_RESULT: 'playback:eventResult',
+  PLAYBACK_REPORT: 'playback:report'
 } as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -110,4 +114,11 @@ export const DEFAULT_PLAYBACK_SETTINGS = {
   repeatDelay: 0,
   humanize: false,
   humanizeAmount: 10
+}
+
+export const DEFAULT_MOUSE_CURVE: MouseCurveSettings = {
+  enabled: false,
+  curvature: 30,
+  overshoot: 10,
+  speedProfile: 'ease-in-out'
 }

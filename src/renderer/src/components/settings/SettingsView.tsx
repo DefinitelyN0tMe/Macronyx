@@ -292,8 +292,8 @@ function RecordingSettings({
         />
       </SettingRow>
       <SettingRow
-        label="Relative Positioning"
-        description="Record mouse positions relative to the active window — macros adapt when windows move"
+        label="Relative Positioning (Experimental)"
+        description="Record mouse positions relative to the active window — macros adapt when windows move. Includes Smart Scaling for resized windows."
       >
         <Toggle
           checked={rec.relativePositioning}
@@ -450,8 +450,8 @@ function AdvancedSettings(): JSX.Element {
 
   return (
     <>
-      <SettingRow label="Version" description="Macronyx v1.3.5">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.3.5</span>
+      <SettingRow label="Version" description="Macronyx v1.4.0">
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.4.0</span>
       </SettingRow>
       <SettingRow
         label="Portable Mode"

@@ -9,6 +9,9 @@ let currentStatus: AppStatus = 'idle'
 let elapsedMs = 0
 let totalDurationMs = 0
 let overlayEnabled = true
+// Playback result counters (v1.4)
+let successCount = 0
+let failedCount = 0
 
 export function createOverlayWindow(): void {
   if (overlayWindow) return
@@ -85,7 +88,18 @@ export function updateOverlayStatus(status: AppStatus, elapsed?: number, totalDu
   currentStatus = status
   if (elapsed !== undefined) elapsedMs = elapsed
   if (totalDuration !== undefined) totalDurationMs = totalDuration
-  if (status === 'idle') totalDurationMs = 0
+  if (status === 'idle') {
+    totalDurationMs = 0
+    successCount = 0
+    failedCount = 0
+  }
+  sendStatusToOverlay()
+}
+
+/** Update playback result counters shown on the overlay (v1.4) */
+export function updateOverlayResults(success: number, failed: number): void {
+  successCount = success
+  failedCount = failed
   sendStatusToOverlay()
 }
 
@@ -94,7 +108,9 @@ function sendStatusToOverlay(): void {
   overlayWindow.webContents.send(IPC.OVERLAY_STATUS, {
     status: currentStatus,
     elapsedMs,
-    totalDurationMs
+    totalDurationMs,
+    successCount,
+    failedCount
   })
 }
 

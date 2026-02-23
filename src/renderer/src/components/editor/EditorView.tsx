@@ -7,6 +7,9 @@ import { Timeline } from './Timeline'
 import { EventInspector } from './EventInspector'
 import { MousePathPreview } from './MousePathPreview'
 import { TriggerPanel } from './TriggerPanel'
+import { PlaybackResultsPanel } from './PlaybackResultsPanel'
+import { DEFAULT_MOUSE_CURVE } from '@shared/constants'
+import type { Macro, MouseCurveSettings } from '@shared/types'
 import '../../styles/timeline.css'
 
 export function EditorView(): JSX.Element {
@@ -18,6 +21,7 @@ export function EditorView(): JSX.Element {
   const updateMacroDescription = useEditorStore((s) => s.updateMacroDescription)
   const smoothDelays = useEditorStore((s) => s.smoothDelays)
   const insertCondition = useEditorStore((s) => s.insertCondition)
+  const updateMouseCurve = useEditorStore((s) => s.updateMouseCurve)
   const zoom = useEditorStore((s) => s.zoom)
   const setZoom = useEditorStore((s) => s.setZoom)
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -35,6 +39,7 @@ export function EditorView(): JSX.Element {
   const [editDesc, setEditDesc] = useState('')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [showSmoothPopover, setShowSmoothPopover] = useState(false)
+  const [showCurvePopover, setShowCurvePopover] = useState(false)
   const [editorTab, setEditorTab] = useState<'timeline' | 'triggers'>('timeline')
   const [smoothWindowSize, setSmoothWindowSize] = useState(5)
   const [smoothMinDelay, setSmoothMinDelay] = useState(10)
@@ -394,6 +399,20 @@ export function EditorView(): JSX.Element {
             onClick={insertCondition}
             color="#22c55e"
           />
+          <div style={{ position: 'relative' }}>
+            <ToolbarBtn
+              label="Curves"
+              onClick={() => setShowCurvePopover(!showCurvePopover)}
+              color={macro.playbackSettings?.mouseCurve?.enabled ? '#06b6d4' : undefined}
+            />
+            {showCurvePopover && (
+              <MouseCurvePopover
+                macro={macro}
+                onUpdate={updateMouseCurve}
+                onClose={() => setShowCurvePopover(false)}
+              />
+            )}
+          </div>
           <div style={{ width: 1, background: 'var(--border-color)', margin: '0 4px', height: 20 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Zoom</span>
@@ -499,6 +518,7 @@ export function EditorView(): JSX.Element {
         <div style={{ display: 'flex', flex: 1, gap: 12, minHeight: 0 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             <Timeline />
+            <PlaybackResultsPanel />
             <MousePathPreview />
           </div>
           <EventInspector />
@@ -544,5 +564,135 @@ function ToolbarBtn({
     >
       {label}
     </button>
+  )
+}
+
+function MouseCurvePopover({
+  macro,
+  onUpdate,
+  onClose
+}: {
+  macro: Macro
+  onUpdate: (curve: MouseCurveSettings) => void
+  onClose: () => void
+}): JSX.Element {
+  const curve = macro.playbackSettings?.mouseCurve ?? { ...DEFAULT_MOUSE_CURVE }
+
+  const update = (patch: Partial<MouseCurveSettings>): void => {
+    onUpdate({ ...curve, ...patch })
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: '100%',
+        right: 0,
+        marginTop: 6,
+        width: 240,
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 8,
+        padding: 14,
+        zIndex: 50,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+          Mouse Curves
+        </div>
+        <button
+          onClick={() => update({ enabled: !curve.enabled })}
+          style={{
+            padding: '3px 10px',
+            borderRadius: 10,
+            border: 'none',
+            background: curve.enabled ? 'var(--accent-cyan)' : '#374151',
+            color: curve.enabled ? '#000' : 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: 10,
+            fontWeight: 600
+          }}
+        >
+          {curve.enabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+        Smooth bezier curves instead of straight-line mouse movement. Per-macro setting.
+      </div>
+
+      {curve.enabled && (
+        <>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+              Curvature: {curve.curvature}%
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={curve.curvature}
+              onChange={(e) => update({ curvature: Number(e.target.value) })}
+              style={{ width: '100%', accentColor: 'var(--accent-cyan)' }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+              Overshoot: {curve.overshoot}%
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={50}
+              value={curve.overshoot}
+              onChange={(e) => update({ overshoot: Number(e.target.value) })}
+              style={{ width: '100%', accentColor: 'var(--accent-violet)' }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>
+              Speed Profile
+            </div>
+            <select
+              value={curve.speedProfile}
+              onChange={(e) => update({ speedProfile: e.target.value as MouseCurveSettings['speedProfile'] })}
+              style={{
+                width: '100%',
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: 11
+              }}
+            >
+              <option value="constant">Constant</option>
+              <option value="ease-in-out">Ease In/Out</option>
+              <option value="natural">Natural</option>
+            </select>
+          </div>
+        </>
+      )}
+
+      <button
+        onClick={onClose}
+        style={{
+          padding: '5px 0',
+          borderRadius: 6,
+          border: 'none',
+          background: 'rgba(255,255,255,0.05)',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+          fontSize: 11
+        }}
+      >
+        Close
+      </button>
+    </div>
   )
 }

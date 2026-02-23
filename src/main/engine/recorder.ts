@@ -110,7 +110,9 @@ export class Recorder {
             title: current.title,
             processName: current.processName,
             offsetX: event.x - current.bounds.x,
-            offsetY: event.y - current.bounds.y
+            offsetY: event.y - current.bounds.y,
+            windowWidth: current.bounds.width,
+            windowHeight: current.bounds.height
           }
         }
       } catch {

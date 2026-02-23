@@ -37,7 +37,7 @@ A living document outlining planned features, improvements, and long-term vision
 
 ---
 
-## v1.3 — "Playback Intelligence" *(released — v1.3.1)*
+## v1.3 — "Playback Intelligence" *(released — v1.3.5)*
 
 | Feature | Description | Size | Status |
 |---------|-------------|:----:|:------:|
@@ -45,21 +45,36 @@ A living document outlining planned features, improvements, and long-term vision
 | Profile auto-switch | Automatically switch settings profiles based on active application/window (detect foreground app) | M | Done |
 | Macro chaining | Run macros sequentially — macro A then B then C | M | Done |
 | Conditional logic | If/else branching in macros (check pixel color, window title, time of day) | L | Done |
-| Relative positioning mode | Record mouse positions relative to active window, not absolute screen coords | M | Done |
+| Relative positioning mode | Record mouse positions relative to active window *(Experimental — frozen, see v1.4 Smart Scaling)* | M | Done |
 | Playback preview | Visualize playback on MousePathPreview without actually moving the cursor | S | Done |
 | Profile management UI | Create/switch/rename/delete settings profiles from Settings → Profiles tab | M | Done |
-| v1.3.1 hotfix | Fix playback regression, nested conditionals, trigger reload, chain hotkeys, pause recording | M | Done |
+| v1.3.1–v1.3.5 hotfixes | Playback regression, nested conditionals, trigger reload, chain hotkeys, pause recording, relative positioning rework | M | Done |
 
 ---
 
-## v1.4 — "Analytics & Insights"
+## v1.4 — "Smart Playback" *(current)*
+
+Smarter, more reliable, and more realistic playback — makes macros adapt to window changes, reports playback health, and moves the mouse naturally.
+
+| Feature | Description | Size | Status |
+|---------|-------------|:----:|:------:|
+| Window-Aware Smart Scaling | Scale mouse coordinates proportionally when the target window changes size (extends relative positioning) | M | Done |
+| Success/Fail Visual Playback Markers | Per-event success/failed/skipped status during playback, overlay counter, timeline indicators, and post-playback summary | M | Done |
+| Natural Mouse Curve Editor | Bezier-based mouse movement with curvature, overshoot, and speed profile settings; replaces linear point-to-point movement | M | Done |
+
+---
+
+## v1.5 — "Smart Targeting & Analytics"
+
+Visual targeting that doesn't depend on coordinates, plus a full analytics dashboard.
 
 | Feature | Description | Size |
 |---------|-------------|:----:|
-| Macro analytics | Dashboard with stats: play count, total time saved, success/failure rate, most-used macros, usage over time chart | L |
-| Playback logging | Log each playback run with timestamps, errors, duration | M |
-| Performance profiling | Measure timing accuracy vs expected, show drift analysis | M |
-| Export analytics | Export stats as CSV/JSON | S |
+| Visual UI Anchors | Image region matching to find UI elements regardless of window position/size — replaces coordinate-based targeting | L-XL |
+| Macro Analytics Dashboard | Stats: play count, total time saved, success/failure rate, most-used macros, usage over time chart | L |
+| Playback Logging | Log each playback run with timestamps, errors, duration (extends v1.4 markers) | M |
+| Performance Profiling | Measure timing accuracy vs expected, show drift analysis | M |
+| Export Analytics | Export stats as CSV/JSON | S |
 
 ---
 
@@ -72,7 +87,6 @@ A living document outlining planned features, improvements, and long-term vision
 | Macro marketplace / sharing | Export macros with metadata, share via link or file | L |
 | Plugin system | Allow community extensions (custom event types, triggers, actions) | XL |
 | Cloud sync | Sync macros and settings across machines (optional, via GitHub Gist or custom backend) | L |
-| Advanced humanizer | ML-based humanization with natural mouse curves, realistic typing patterns, micro-pauses | L |
 | Multi-monitor enhancements | Per-monitor DPI awareness, monitor-relative recording mode, display layout changes | M |
 | Macro variables | Define variables (click_x, delay_ms) that can be changed per-run without editing the macro | M |
 

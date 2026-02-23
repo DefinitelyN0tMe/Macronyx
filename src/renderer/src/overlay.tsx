@@ -7,6 +7,8 @@ interface StatusUpdate {
   status: OverlayStatus
   elapsedMs: number
   totalDurationMs: number
+  successCount?: number
+  failedCount?: number
 }
 
 const statusConfig: Record<OverlayStatus, { color: string; label: string }> = {
@@ -27,6 +29,8 @@ function OverlayWidget(): JSX.Element {
   const [status, setStatus] = useState<OverlayStatus>('idle')
   const [elapsedMs, setElapsedMs] = useState(0)
   const [totalDurationMs, setTotalDurationMs] = useState(0)
+  const [successCount, setSuccessCount] = useState(0)
+  const [failedCount, setFailedCount] = useState(0)
   const [hovered, setHovered] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const baseElapsedRef = useRef(0)
@@ -38,15 +42,20 @@ function OverlayWidget(): JSX.Element {
       setStatus(update.status)
       setElapsedMs(update.elapsedMs)
       if (update.totalDurationMs) setTotalDurationMs(update.totalDurationMs)
-      if (update.status === 'idle') setTotalDurationMs(0)
-      // Store the elapsed offset so local timer can continue from it
+      if (update.status === 'idle') {
+        setTotalDurationMs(0)
+        setSuccessCount(0)
+        setFailedCount(0)
+      }
+      if (update.successCount !== undefined) setSuccessCount(update.successCount)
+      if (update.failedCount !== undefined) setFailedCount(update.failedCount)
       baseElapsedRef.current = update.elapsedMs
       timerStartRef.current = Date.now()
     })
     return unsub
   }, [])
 
-  // Local timer for recording mode (recording doesn't send periodic progress)
+  // Local timer for recording mode
   useEffect(() => {
     if (status === 'recording') {
       timerRef.current = setInterval(() => {
@@ -68,6 +77,7 @@ function OverlayWidget(): JSX.Element {
 
   const config = statusConfig[status]
   const showTimer = status === 'recording' || status === 'playing' || status === 'paused'
+  const showResults = (status === 'playing' || status === 'paused') && (successCount > 0 || failedCount > 0)
 
   return (
     <div
@@ -81,7 +91,7 @@ function OverlayWidget(): JSX.Element {
         height: '100%',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
         padding: '0 14px',
         borderRadius: 10,
         background: hovered ? 'rgba(13, 17, 23, 0.95)' : 'rgba(13, 17, 23, 0.88)',
@@ -131,6 +141,21 @@ function OverlayWidget(): JSX.Element {
       >
         {config.label}
       </span>
+
+      {/* Playback result counter (v1.4) */}
+      {showResults && (
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: 0.3,
+            color: failedCount > 0 ? '#ef4444' : '#22c55e'
+          }}
+        >
+          {successCount}{failedCount > 0 && <span style={{ color: '#ef4444' }}>/{failedCount}!</span>}
+        </span>
+      )}
 
       {/* Timer */}
       {showTimer && (

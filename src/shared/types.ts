@@ -32,6 +32,9 @@ export interface MacroEvent {
     processName: string
     offsetX: number
     offsetY: number
+    /** Window dimensions at recording time — used for proportional scaling (v1.4) */
+    windowWidth?: number
+    windowHeight?: number
   }
   /** Conditional logic — links condition_start/else/end events */
   conditionPairId?: string
@@ -54,12 +57,22 @@ export interface ConditionConfig {
   beforeTime?: string // "HH:mm"
 }
 
+/** Mouse curve settings for natural movement (v1.4) */
+export interface MouseCurveSettings {
+  enabled: boolean
+  curvature: number    // 0-100 — how much the path curves
+  overshoot: number    // 0-50 — how much cursor overshoots the target
+  speedProfile: 'constant' | 'ease-in-out' | 'natural'
+}
+
 export interface PlaybackSettings {
   speed: number // 0.25 - 4.0
   repeatCount: number // 0 = infinite
   repeatDelay: number // ms between repeats
   humanize: boolean
   humanizeAmount: number // 0-100
+  /** Natural mouse curve settings (v1.4) */
+  mouseCurve?: MouseCurveSettings
 }
 
 export interface Macro {
@@ -221,4 +234,26 @@ export interface RecordingState {
   eventCount: number
   elapsedMs: number
   startTime: number
+}
+
+// ─── Playback Results (v1.4) ──────────────────────────────────────────
+
+export type EventResultStatus = 'pending' | 'success' | 'failed' | 'skipped'
+
+export interface EventResult {
+  eventIndex: number
+  status: EventResultStatus
+  error?: string
+  timestamp: number // when the result was recorded
+}
+
+export interface PlaybackReport {
+  macroId: string
+  startedAt: number
+  finishedAt: number
+  totalEvents: number
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  results: EventResult[]
 }
