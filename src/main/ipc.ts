@@ -697,6 +697,48 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
     }
   })
 
+  // ─── Playback Logging & Analytics (v1.6) ──────────────────────────
+
+  ipcMain.handle(IPC.LOG_GET_FOR_MACRO, async (_e, macroId: string) => {
+    return logStorage!.getLogsForMacro(macroId)
+  })
+
+  ipcMain.handle(IPC.LOG_GET_AGGREGATE, async () => {
+    return logStorage!.getAggregate()
+  })
+
+  ipcMain.handle(IPC.LOG_CLEAR, async (_e, macroId: string) => {
+    await logStorage!.clearLogsForMacro(macroId)
+    return { success: true }
+  })
+
+  ipcMain.handle(IPC.LOG_CLEAR_ALL, async () => {
+    await logStorage!.clearAll()
+    return { success: true }
+  })
+
+  ipcMain.handle(IPC.LOG_EXPORT, async (_e, format: 'csv' | 'json') => {
+    const content = format === 'csv'
+      ? await logStorage!.exportAsCSV()
+      : await logStorage!.exportAsJSON()
+
+    const ext = format === 'csv' ? 'csv' : 'json'
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Analytics',
+      defaultPath: `macronyx-analytics.${ext}`,
+      filters: [
+        { name: format === 'csv' ? 'CSV Files' : 'JSON Files', extensions: [ext] }
+      ]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, error: 'Cancelled' }
+    }
+
+    await fs.promises.writeFile(result.filePath, content, 'utf-8')
+    return { success: true, path: result.filePath }
+  })
+
   // Initialize hotkeys and services on startup
   settingsStorage.get().then(async (settings) => {
     setupHotkeys(mainWindow, settings)
@@ -880,48 +922,6 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
   })
 
   hotkeyManager.registerAll(settings.hotkeys)
-
-  // ─── Playback Logging & Analytics (v1.6) ──────────────────────────
-
-  ipcMain.handle(IPC.LOG_GET_FOR_MACRO, async (_e, macroId: string) => {
-    return logStorage!.getLogsForMacro(macroId)
-  })
-
-  ipcMain.handle(IPC.LOG_GET_AGGREGATE, async () => {
-    return logStorage!.getAggregate()
-  })
-
-  ipcMain.handle(IPC.LOG_CLEAR, async (_e, macroId: string) => {
-    await logStorage!.clearLogsForMacro(macroId)
-    return { success: true }
-  })
-
-  ipcMain.handle(IPC.LOG_CLEAR_ALL, async () => {
-    await logStorage!.clearAll()
-    return { success: true }
-  })
-
-  ipcMain.handle(IPC.LOG_EXPORT, async (_e, format: 'csv' | 'json') => {
-    const content = format === 'csv'
-      ? await logStorage!.exportAsCSV()
-      : await logStorage!.exportAsJSON()
-
-    const ext = format === 'csv' ? 'csv' : 'json'
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Export Analytics',
-      defaultPath: `macronyx-analytics.${ext}`,
-      filters: [
-        { name: format === 'csv' ? 'CSV Files' : 'JSON Files', extensions: [ext] }
-      ]
-    })
-
-    if (result.canceled || !result.filePath) {
-      return { success: false, error: 'Cancelled' }
-    }
-
-    await fs.promises.writeFile(result.filePath, content, 'utf-8')
-    return { success: true, path: result.filePath }
-  })
 }
 
 export function cleanupIpc(): void {
