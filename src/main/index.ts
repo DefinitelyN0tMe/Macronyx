@@ -93,7 +93,7 @@ app.whenReady().then(async () => {
 
     // Listen for "show main window" from overlay
     ipcMain.on(IPC.OVERLAY_SHOW_MAIN, () => {
-      if (mainWindow) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.show()
         mainWindow.focus()
       }

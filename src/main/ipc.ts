@@ -21,6 +21,21 @@ import { appState } from './app-state'
 import { getPortableMarkerPath } from './utils/paths'
 import { updateOverlayStatus, updateOverlayResults, setOverlayEnabled } from './overlay'
 
+/** Safe IPC send — silently skips if the BrowserWindow is destroyed (tray / quit) */
+function safeSend(win: BrowserWindow, channel: string, ...args: unknown[]): void {
+  if (!win.isDestroyed()) {
+    win.webContents.send(channel, ...args)
+  }
+}
+
+/** Safe window show — guard against destroyed window */
+function safeShow(win: BrowserWindow): void {
+  if (!win.isDestroyed()) {
+    win.show()
+    win.focus()
+  }
+}
+
 let recorder: Recorder | null = null
 let player: Player | null = null
 let chainPlayer: ChainPlayer | null = null
@@ -156,12 +171,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
       recorder!.start(settings.recording, (event: MacroEvent) => {
         currentRecordingEvents.push(event)
-        mainWindow.webContents.send(IPC.RECORDING_EVENT, event)
+        safeSend(mainWindow, IPC.RECORDING_EVENT, event)
       })
 
-      mainWindow.webContents.send(IPC.APP_STATUS, 'recording')
+      safeSend(mainWindow, IPC.APP_STATUS, 'recording')
       updateOverlayStatus('recording', 0)
-      mainWindow.webContents.send(IPC.RECORDING_STATUS, {
+      safeSend(mainWindow, IPC.RECORDING_STATUS, {
         isRecording: true,
         eventCount: 0,
         elapsedMs: 0,
@@ -207,9 +222,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       }
       await macroStorage!.save(macro)
       currentRecordingEvents = []
-      mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+      safeSend(mainWindow, IPC.APP_STATUS, 'idle')
       updateOverlayStatus('idle')
-      mainWindow.webContents.send(IPC.RECORDING_STATUS, {
+      safeSend(mainWindow, IPC.RECORDING_STATUS, {
         isRecording: false,
         eventCount: events.length,
         elapsedMs: duration,
@@ -230,9 +245,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       cleanupOrphanedKeyDowns()
 
       const elapsed = getRecordingElapsed()
-      mainWindow.webContents.send(IPC.APP_STATUS, 'recording_paused')
+      safeSend(mainWindow, IPC.APP_STATUS, 'recording_paused')
       updateOverlayStatus('paused', elapsed)
-      mainWindow.webContents.send(IPC.RECORDING_STATUS, {
+      safeSend(mainWindow, IPC.RECORDING_STATUS, {
         isRecording: true,
         isPaused: true,
         eventCount: currentRecordingEvents.length,
@@ -254,9 +269,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       }
 
       const elapsed = getRecordingElapsed()
-      mainWindow.webContents.send(IPC.APP_STATUS, 'recording')
+      safeSend(mainWindow, IPC.APP_STATUS, 'recording')
       updateOverlayStatus('recording', elapsed)
-      mainWindow.webContents.send(IPC.RECORDING_STATUS, {
+      safeSend(mainWindow, IPC.RECORDING_STATUS, {
         isRecording: true,
         isPaused: false,
         eventCount: currentRecordingEvents.length,
@@ -297,18 +312,18 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       playbackPaused = false
       playbackSuccessCount = 0
       playbackFailedCount = 0
-      mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+      safeSend(mainWindow, IPC.APP_STATUS, 'playing')
       updateOverlayStatus('playing', 0, totalDuration)
       player!.play(
         macro,
         (state: PlaybackState) => {
-          mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
+          safeSend(mainWindow, IPC.PLAYBACK_PROGRESS, state)
           if (!playbackPaused) {
             updateOverlayStatus(state.status === 'idle' ? 'idle' : state.status, state.elapsedMs, totalDuration)
           }
           if (state.status === 'idle') {
             playbackPaused = false
-            mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+            safeSend(mainWindow, IPC.APP_STATUS, 'idle')
             updateOverlayStatus('idle')
           }
         },
@@ -316,10 +331,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
           if (result.status === 'success') playbackSuccessCount++
           else if (result.status === 'failed') playbackFailedCount++
           updateOverlayResults(playbackSuccessCount, playbackFailedCount)
-          mainWindow.webContents.send(IPC.PLAYBACK_EVENT_RESULT, result)
+          safeSend(mainWindow, IPC.PLAYBACK_EVENT_RESULT, result)
         },
         (report: PlaybackReport) => {
-          mainWindow.webContents.send(IPC.PLAYBACK_REPORT, report)
+          safeSend(mainWindow, IPC.PLAYBACK_REPORT, report)
           persistPlaybackLog(report, macro.name, 'manual')
         }
       )
@@ -332,7 +347,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.PLAYBACK_STOP, async () => {
     playbackPaused = false
     player!.stop() // also releases any held keys
-    mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+    safeSend(mainWindow, IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
     return { success: true }
   })
@@ -340,7 +355,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.PLAYBACK_PAUSE, async () => {
     playbackPaused = true
     player!.pause()
-    mainWindow.webContents.send(IPC.APP_STATUS, 'paused')
+    safeSend(mainWindow, IPC.APP_STATUS, 'paused')
     updateOverlayStatus('paused')
     return { success: true }
   })
@@ -348,7 +363,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.PLAYBACK_RESUME, async () => {
     playbackPaused = false
     player!.resume()
-    mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+    safeSend(mainWindow, IPC.APP_STATUS, 'playing')
     updateOverlayStatus('playing')
     return { success: true }
   })
@@ -478,19 +493,19 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         humanizeAmount: currentSettings.playback.defaultHumanizeAmount
       }
 
-      mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+      safeSend(mainWindow, IPC.APP_STATUS, 'playing')
       updateOverlayStatus('playing')
 
       chainPlayer!.play(
         chain,
         async (macroId: string) => macroStorage!.load(macroId),
         (state) => {
-          mainWindow.webContents.send(IPC.CHAIN_PROGRESS, state)
+          safeSend(mainWindow, IPC.CHAIN_PROGRESS, state)
           if (state.status === 'playing') {
             // Keep overlay showing "playing" between macros in chain
             updateOverlayStatus('playing')
           } else if (state.status === 'idle') {
-            mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+            safeSend(mainWindow, IPC.APP_STATUS, 'idle')
             updateOverlayStatus('idle')
           }
         },
@@ -510,7 +525,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC.CHAIN_STOP, async () => {
     chainPlayer!.stop()
-    mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+    safeSend(mainWindow, IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
     return { success: true }
   })
@@ -538,7 +553,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle(IPC.PIXEL_PICK, async () => {
     try {
       // Hide the app so the user can see and click on the target pixel
-      mainWindow.hide()
+      if (!mainWindow.isDestroyed()) mainWindow.hide()
       // Small delay so the window has time to fully hide
       await new Promise((r) => setTimeout(r, 300))
 
@@ -570,16 +585,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       }
 
       // Show window again
-      mainWindow.show()
-      mainWindow.focus()
+      safeShow(mainWindow)
 
       if (result && color) {
         return { success: true, x: result.x, y: result.y, color }
       }
       return { success: false, error: 'Timeout or no click detected' }
     } catch (err) {
-      mainWindow.show()
-      mainWindow.focus()
+      safeShow(mainWindow)
       return { success: false, error: String(err) }
     }
   })
@@ -680,7 +693,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         const mergedSettings = { ...profile.settings, profileRules: currentSettings.profileRules }
         await settingsStorage!.set(mergedSettings)
         setupHotkeys(mainWindow, mergedSettings)
-        mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId: id, profileName: profile.name })
+        safeSend(mainWindow, IPC.PROFILE_ACTIVATED, { profileId: id, profileName: profile.name })
 
         // Apply new playback settings mid-play if player is active
         if (player!.getIsPlaying()) {
@@ -782,7 +795,7 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
       return
     }
 
-    mainWindow.webContents.send(IPC.TRIGGER_FIRED, data)
+    safeSend(mainWindow, IPC.TRIGGER_FIRED, data)
     // Auto-play the macro
     try {
       const macro = await macroStorage!.load(data.macroId)
@@ -798,14 +811,14 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
         }
         playbackSuccessCount = 0
         playbackFailedCount = 0
-        mainWindow.webContents.send(IPC.APP_STATUS, 'playing')
+        safeSend(mainWindow, IPC.APP_STATUS, 'playing')
         updateOverlayStatus('playing')
         player!.play(
           macro,
           (state: PlaybackState) => {
-            mainWindow.webContents.send(IPC.PLAYBACK_PROGRESS, state)
+            safeSend(mainWindow, IPC.PLAYBACK_PROGRESS, state)
             if (state.status === 'idle') {
-              mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+              safeSend(mainWindow, IPC.APP_STATUS, 'idle')
               updateOverlayStatus('idle')
             }
           },
@@ -813,10 +826,10 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
             if (result.status === 'success') playbackSuccessCount++
             else if (result.status === 'failed') playbackFailedCount++
             updateOverlayResults(playbackSuccessCount, playbackFailedCount)
-            mainWindow.webContents.send(IPC.PLAYBACK_EVENT_RESULT, result)
+            safeSend(mainWindow, IPC.PLAYBACK_EVENT_RESULT, result)
           },
           (report: PlaybackReport) => {
-            mainWindow.webContents.send(IPC.PLAYBACK_REPORT, report)
+            safeSend(mainWindow, IPC.PLAYBACK_REPORT, report)
             persistPlaybackLog(report, macro.name, 'trigger')
           }
         )
@@ -861,7 +874,7 @@ function startProfileSwitcher(mainWindow: BrowserWindow, settings: AppSettings):
         const mergedSettings = { ...profile.settings, profileRules: currentSettings.profileRules }
         await settingsStorage!.set(mergedSettings)
         setupHotkeys(mainWindow, mergedSettings)
-        mainWindow.webContents.send(IPC.PROFILE_ACTIVATED, { profileId, profileName: profile.name })
+        safeSend(mainWindow, IPC.PROFILE_ACTIVATED, { profileId, profileName: profile.name })
 
         // Apply new playback settings mid-play if player is active
         if (player!.getIsPlaying()) {
@@ -883,19 +896,19 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
   if (!hotkeyManager) return
 
   hotkeyManager.setCallback('recordStart', () => {
-    mainWindow.webContents.send('hotkey:action', 'recordStart')
+    safeSend(mainWindow, 'hotkey:action', 'recordStart')
   })
   hotkeyManager.setCallback('recordStop', () => {
-    mainWindow.webContents.send('hotkey:action', 'recordStop')
+    safeSend(mainWindow, 'hotkey:action', 'recordStop')
   })
   hotkeyManager.setCallback('togglePause', () => {
-    mainWindow.webContents.send('hotkey:action', 'togglePause')
+    safeSend(mainWindow, 'hotkey:action', 'togglePause')
   })
   hotkeyManager.setCallback('playStart', () => {
-    mainWindow.webContents.send('hotkey:action', 'playStart')
+    safeSend(mainWindow, 'hotkey:action', 'playStart')
   })
   hotkeyManager.setCallback('playStop', () => {
-    mainWindow.webContents.send('hotkey:action', 'playStop')
+    safeSend(mainWindow, 'hotkey:action', 'playStop')
   })
   hotkeyManager.setCallback('emergencyStop', () => {
     // Stop all recording/playback/chains and reset all state
@@ -913,11 +926,10 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
       chainPlayer.stop()
     }
     currentRecordingEvents = []
-    mainWindow.webContents.send(IPC.APP_STATUS, 'idle')
+    safeSend(mainWindow, IPC.APP_STATUS, 'idle')
     updateOverlayStatus('idle')
-    if (!mainWindow.isVisible()) {
-      mainWindow.show()
-      mainWindow.focus()
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      safeShow(mainWindow)
     }
   })
 

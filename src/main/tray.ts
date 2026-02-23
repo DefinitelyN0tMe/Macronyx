@@ -17,8 +17,10 @@ export class TrayManager {
     this.updateContextMenu('Idle')
 
     this.tray.on('double-click', () => {
-      this.mainWindow.show()
-      this.mainWindow.focus()
+      if (!this.mainWindow.isDestroyed()) {
+        this.mainWindow.show()
+        this.mainWindow.focus()
+      }
     })
   }
 
@@ -30,8 +32,10 @@ export class TrayManager {
       {
         label: 'Show Window',
         click: () => {
-          this.mainWindow.show()
-          this.mainWindow.focus()
+          if (!this.mainWindow.isDestroyed()) {
+            this.mainWindow.show()
+            this.mainWindow.focus()
+          }
         }
       },
       { type: 'separator' },
