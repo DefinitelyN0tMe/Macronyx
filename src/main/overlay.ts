@@ -22,7 +22,7 @@ export function createOverlayWindow(): void {
 
   overlayWindow = new BrowserWindow({
     width: 220,
-    height: 52,
+    height: 58,
     x: screenWidth - 240,
     y: 20,
     frame: false,

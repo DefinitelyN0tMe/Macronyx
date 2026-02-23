@@ -1,4 +1,5 @@
 import { useAppStore } from '../../stores/appStore'
+import { Tooltip } from '@mantine/core'
 
 interface NavItem {
   id: string
@@ -93,10 +94,11 @@ export function Sidebar({
   }
 
   return (
-    <div
+    <nav
+      role="navigation"
       style={{
         width: 56,
-        background: '#0d1117',
+        background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border-subtle)',
         display: 'flex',
         flexDirection: 'column',
@@ -110,53 +112,55 @@ export function Sidebar({
       {navItems.map((item) => {
         const isActive = activeView === item.id
         return (
-          <button
-            key={item.id}
-            onClick={() => handleNav(item.id)}
-            title={item.label}
-            style={{
-              width: 40,
-              height: 40,
-              border: 'none',
-              borderRadius: 8,
-              background: isActive ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-              color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
-              position: 'relative'
-            }}
-            onMouseEnter={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-                e.currentTarget.style.color = 'var(--text-primary)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isActive) {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'var(--text-secondary)'
-              }
-            }}
-          >
-            {isActive && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: -8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 3,
-                  height: 20,
-                  borderRadius: 2,
-                  background: 'var(--accent-cyan)'
-                }}
-              />
-            )}
-            {item.icon}
-          </button>
+          <Tooltip key={item.id} label={item.label} position="right" withArrow transitionProps={{ duration: 150 }}>
+            <button
+              onClick={() => handleNav(item.id)}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
+              style={{
+                width: 40,
+                height: 40,
+                border: 'none',
+                borderRadius: 8,
+                background: isActive ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }
+              }}
+            >
+              {isActive && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: -8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 3,
+                    height: 20,
+                    borderRadius: 2,
+                    background: 'var(--accent-cyan)'
+                  }}
+                />
+              )}
+              {item.icon}
+            </button>
+          </Tooltip>
         )
       })}
 
@@ -165,9 +169,9 @@ export function Sidebar({
 
       {/* Donate button */}
       {onDonate && (
+        <Tooltip label="Support Macronyx" position="right" withArrow>
         <button
           onClick={onDonate}
-          title="Support Macronyx"
           style={{
             width: 40,
             height: 40,
@@ -200,7 +204,8 @@ export function Sidebar({
             <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
           </svg>
         </button>
+        </Tooltip>
       )}
-    </div>
+    </nav>
   )
 }

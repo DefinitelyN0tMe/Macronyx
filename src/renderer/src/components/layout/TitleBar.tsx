@@ -1,13 +1,14 @@
 import { useAppStore } from '../../stores/appStore'
+import { STATUS_COLORS } from '@shared/constants'
 
 export function TitleBar(): JSX.Element {
   const status = useAppStore((s) => s.status)
 
   const statusColors: Record<string, string> = {
-    idle: '#6b7280',
-    recording: '#ef4444',
-    playing: '#22c55e',
-    paused: '#f59e0b'
+    idle: STATUS_COLORS.idle,
+    recording: STATUS_COLORS.recording,
+    playing: STATUS_COLORS.playing,
+    paused: STATUS_COLORS.paused
   }
 
   const statusLabels: Record<string, string> = {

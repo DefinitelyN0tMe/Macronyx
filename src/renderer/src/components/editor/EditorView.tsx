@@ -5,7 +5,7 @@ import { useMacroStore } from '../../stores/macroStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { Timeline } from './Timeline'
 import { EventInspector } from './EventInspector'
-import { MousePathPreview } from './MousePathPreview'
+import { PreviewSection } from './MousePathPreview'
 import { TriggerPanel } from './TriggerPanel'
 import { PlaybackResultsPanel } from './PlaybackResultsPanel'
 import { DEFAULT_MOUSE_CURVE } from '@shared/constants'
@@ -432,7 +432,6 @@ export function EditorView(): JSX.Element {
           <button
             onClick={handleSave}
             disabled={saveStatus === 'saving'}
-            tabIndex={-1}
             style={{
               padding: '6px 14px',
               borderRadius: 6,
@@ -519,7 +518,7 @@ export function EditorView(): JSX.Element {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             <Timeline />
             <PlaybackResultsPanel />
-            <MousePathPreview />
+            <PreviewSection />
           </div>
           <EventInspector />
         </div>

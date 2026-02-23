@@ -63,17 +63,17 @@ Smarter, more reliable, and more realistic playback — reports playback health 
 
 ---
 
-## v1.5 — "UI Refresh"
+## v1.5 — "UI Refresh" *(released — v1.5.0)*
 
-Modernize and polish the interface — better editor experience, improved overlay widget, and overall UX enhancements.
+Modernized interface — better editor experience, improved overlay widget, and overall UX enhancements.
 
-| Feature | Description | Size |
-|---------|-------------|:----:|
-| Editor UI overhaul | Redesign the timeline editor layout for better usability — improved track layout, event chip styling, better visual hierarchy, cleaner toolbar | L |
-| Overlay widget redesign | New overlay widget with richer status display, smoother animations, compact/expanded modes, and improved positioning | M |
-| Library & navigation polish | Improved sidebar navigation, better macro card design, smoother view transitions, and responsive layout improvements | M |
-| Settings UI improvements | Cleaner settings layout with better grouping, visual feedback, and inline help | S |
-| Accessibility & keyboard nav | Consistent focus states, keyboard navigation through all views, better contrast ratios | M |
+| Feature | Description | Size | Status |
+|---------|-------------|:----:|:------:|
+| Preview control bar & visualizer | Play/pause/stop buttons, seek scrubber, speed selector, taller canvas (220px), timeline playhead sync | L | Done |
+| Overlay widget redesign | Progress bar, shared color constants, font alignment, increased height | M | Done |
+| Sidebar & navigation polish | Mantine Tooltips, CSS variable backgrounds, ARIA navigation role | M | Done |
+| Shared design system | STATUS_COLORS constant, centralized color definitions, reduced duplication | S | Done |
+| Accessibility & keyboard nav | Focus-visible outlines, ARIA attributes, keyboard-reachable buttons | M | Done |
 
 ---
 

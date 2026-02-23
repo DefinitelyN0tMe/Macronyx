@@ -29,6 +29,7 @@ export function Timeline(): JSX.Element {
   const undo = useEditorStore((s) => s.undo)
   const redo = useEditorStore((s) => s.redo)
   const playbackResults = useEditorStore((s) => s.playbackResults)
+  const playheadMs = useEditorStore((s) => s.playheadMs)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(2000)
   const lastSelectedRef = useRef<string | null>(null)
@@ -215,6 +216,15 @@ export function Timeline(): JSX.Element {
       >
         {/* Ruler */}
         <TimelineRuler zoom={zoom} duration={macro.duration} scrollOffset={scrollOffset} viewportWidth={containerWidth} />
+
+        {/* Playhead — syncs with preview playback */}
+        {playheadMs > 0 && (
+          <div
+            className="timeline-playhead"
+            style={{ left: (playheadMs / 1000) * zoom - scrollOffset + 80 }}
+            aria-hidden="true"
+          />
+        )}
 
         {/* Mouse Track */}
         <div className="timeline-track">

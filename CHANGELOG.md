@@ -5,6 +5,29 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-02-23 — "UI Refresh"
+
+### Added
+- **Preview control bar** — full play/pause/stop buttons, seek scrubber, time display, and speed selector (0.25x–4x) below the mouse path visualizer. Replaces the old overlay-only play/stop buttons
+- **Timeline playhead** — red playhead line with triangle marker syncs with preview playback position in real-time. Uses the existing `.timeline-playhead` CSS that was previously unused
+- **Preview pause/resume** — pause the animated preview at any point, seek to a specific timestamp with the scrubber, then resume. Preview speed is independent of macro playback speed
+- **Overlay progress bar** — thin color-coded progress bar at the bottom of the overlay widget during playback, showing elapsed vs total duration
+- **Sidebar Mantine Tooltips** — replaced native `title` tooltips with styled Mantine `<Tooltip>` components with arrows and smooth transitions. First Mantine component adoption
+- **Focus-visible outlines** — global cyan outline on keyboard-focused elements for accessibility
+- **ARIA attributes** — `role="navigation"` on sidebar, `aria-current="page"` on active nav, `role="status"` + `aria-live="polite"` on playback results, `role="img"` + `aria-label` on canvas
+
+### Changed
+- Visualizer canvas height increased from 160px to 220px for better visibility
+- Preview state migrated from local React `useState` to Zustand store (`isPreviewPlaying`, `isPreviewPaused`, `previewElapsedMs`, `previewSpeed`) for cross-component sync
+- Preview elapsed time now drives Timeline `playheadMs` automatically via `setPreviewElapsedMs → setPlayheadMs` chain
+- Canvas bezier rendering improved with proper midpoint-based smoothing technique
+- Added screen boundary indicator (subtle dashed rectangle) to visualizer canvas
+- Overlay widget height increased from 52px to 58px to accommodate progress bar
+- Overlay font-family aligned with main app (added `'Inter'` prefix)
+- Sidebar background changed from hardcoded `#0d1117` to CSS variable `var(--bg-surface)`
+- Status colors centralized in `STATUS_COLORS` constant in `src/shared/constants.ts` — replaces 3+ copies of hardcoded hex values across TitleBar, overlay, and editor
+- Save button in editor toolbar now keyboard-focusable (removed `tabIndex={-1}`)
+
 ## [1.4.1] - 2026-02-23
 
 ### Fixed

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
+import { STATUS_COLORS } from '../../shared/constants'
 
 type OverlayStatus = 'idle' | 'recording' | 'playing' | 'paused'
 
@@ -12,10 +13,10 @@ interface StatusUpdate {
 }
 
 const statusConfig: Record<OverlayStatus, { color: string; label: string }> = {
-  idle: { color: '#22c55e', label: 'Idle' },
-  recording: { color: '#ef4444', label: 'Recording' },
-  playing: { color: '#06b6d4', label: 'Playing' },
-  paused: { color: '#f59e0b', label: 'Paused' }
+  idle: { color: STATUS_COLORS.playing, label: 'Idle' },
+  recording: { color: STATUS_COLORS.recording, label: 'Recording' },
+  playing: { color: STATUS_COLORS.accentCyan, label: 'Playing' },
+  paused: { color: STATUS_COLORS.paused, label: 'Paused' }
 }
 
 function formatTime(ms: number): string {
@@ -99,7 +100,7 @@ function OverlayWidget(): JSX.Element {
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         boxSizing: 'border-box',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         userSelect: 'none'
       }}
     >
@@ -189,6 +190,30 @@ function OverlayWidget(): JSX.Element {
         <rect x="14" y="14" width="7" height="7" />
         <rect x="3" y="14" width="7" height="7" />
       </svg>
+
+      {/* Playback progress bar */}
+      {totalDurationMs > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            borderRadius: '0 0 10px 10px',
+            overflow: 'hidden'
+          }}
+        >
+          <div
+            style={{
+              width: `${Math.min(100, (elapsedMs / totalDurationMs) * 100)}%`,
+              height: '100%',
+              background: config.color,
+              transition: 'width 0.2s linear'
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

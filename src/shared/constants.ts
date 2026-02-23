@@ -122,3 +122,16 @@ export const DEFAULT_MOUSE_CURVE: MouseCurveSettings = {
   overshoot: 10,
   speedProfile: 'ease-in-out'
 }
+
+/** Shared status/UI color constants — single source of truth */
+export const STATUS_COLORS = {
+  idle: '#6b7280',
+  recording: '#ef4444',
+  playing: '#22c55e',
+  paused: '#f59e0b',
+  accentCyan: '#06b6d4',
+  accentViolet: '#a855f7',
+  danger: '#ef4444',
+  success: '#22c55e',
+  warning: '#f59e0b'
+} as const

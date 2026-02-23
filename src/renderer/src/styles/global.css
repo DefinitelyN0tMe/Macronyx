@@ -81,3 +81,14 @@ body {
 .animate-slide-in {
   animation: slide-in 0.2s ease-out;
 }
+
+/* Accessibility — focus-visible outlines */
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}

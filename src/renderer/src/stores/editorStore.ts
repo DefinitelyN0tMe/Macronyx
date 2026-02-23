@@ -20,6 +20,9 @@ interface EditorState {
   scrollOffset: number
   playheadMs: number
   isPreviewPlaying: boolean
+  isPreviewPaused: boolean
+  previewElapsedMs: number
+  previewSpeed: number
   isDirty: boolean
   clipboard: MacroEvent[]
 
@@ -51,6 +54,10 @@ interface EditorState {
   setZoom: (zoom: number) => void
   setScrollOffset: (offset: number) => void
   setPlayheadMs: (ms: number) => void
+  setPreviewPlaying: (playing: boolean) => void
+  setPreviewPaused: (paused: boolean) => void
+  setPreviewElapsedMs: (ms: number) => void
+  setPreviewSpeed: (speed: number) => void
   updateMouseCurve: (curve: MouseCurveSettings) => void
   addPlaybackResult: (result: EventResult) => void
   setPlaybackReport: (report: PlaybackReport | null) => void
@@ -95,6 +102,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   scrollOffset: 0,
   playheadMs: 0,
   isPreviewPlaying: false,
+  isPreviewPaused: false,
+  previewElapsedMs: 0,
+  previewSpeed: 1,
   isDirty: false,
   clipboard: [],
   history: [],
@@ -110,6 +120,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       historyIndex: 0,
       scrollOffset: 0,
       playheadMs: 0,
+      isPreviewPlaying: false,
+      isPreviewPaused: false,
+      previewElapsedMs: 0,
       isDirty: false
     })
   },
@@ -367,6 +380,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setZoom: (zoom) => set({ zoom: Math.max(10, Math.min(500, zoom)) }),
   setScrollOffset: (offset) => set({ scrollOffset: Math.max(0, offset) }),
   setPlayheadMs: (ms) => set({ playheadMs: Math.max(0, ms) }),
+  setPreviewPlaying: (playing) => set({ isPreviewPlaying: playing }),
+  setPreviewPaused: (paused) => set({ isPreviewPaused: paused }),
+  setPreviewElapsedMs: (ms) => {
+    set({ previewElapsedMs: ms })
+    get().setPlayheadMs(ms)
+  },
+  setPreviewSpeed: (speed) => set({ previewSpeed: speed }),
 
   undo: () => {
     const { history, historyIndex, macro } = get()

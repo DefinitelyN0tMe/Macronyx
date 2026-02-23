@@ -12,6 +12,8 @@ export function PlaybackResultsPanel(): JSX.Element | null {
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         background: 'var(--bg-secondary)',
         borderRadius: 8,

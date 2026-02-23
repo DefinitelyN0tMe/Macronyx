@@ -1,20 +1,105 @@
-import { useRef, useEffect, useCallback, useState } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 
-export function MousePathPreview(): JSX.Element {
+function formatPreviewTime(ms: number): string {
+  const totalSeconds = ms / 1000
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toFixed(1).padStart(4, '0')}`
+}
+
+// SVG icon components for control bar
+function PlayIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="5,3 19,12 5,21" />
+    </svg>
+  )
+}
+
+function PauseIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="5" y="3" width="4" height="18" rx="1" />
+      <rect x="15" y="3" width="4" height="18" rx="1" />
+    </svg>
+  )
+}
+
+function StopIcon(): JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+    </svg>
+  )
+}
+
+// Control bar button
+function CtrlBtn({
+  onClick,
+  title,
+  color,
+  disabled,
+  children
+}: {
+  onClick: () => void
+  title: string
+  color: string
+  disabled?: boolean
+  children: React.ReactNode
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      style={{
+        width: 30,
+        height: 30,
+        border: 'none',
+        borderRadius: 6,
+        background: disabled ? 'rgba(255,255,255,0.03)' : `${color}20`,
+        color: disabled ? 'var(--text-muted)' : color,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.15s ease',
+        opacity: disabled ? 0.4 : 1,
+        flexShrink: 0
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled) e.currentTarget.style.background = `${color}35`
+      }}
+      onMouseLeave={(e) => {
+        if (!disabled) e.currentTarget.style.background = `${color}20`
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+export function PreviewSection(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
+  const pausedElapsedRef = useRef<number>(0)
+  const playStartWallRef = useRef<number>(0)
+  const canvasSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+
   const macro = useEditorStore((s) => s.macro)
   const selectedEventIds = useEditorStore((s) => s.selectedEventIds)
   const selectEvents = useEditorStore((s) => s.selectEvents)
-  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
-  const previewStartRef = useRef<number>(0)
-  const previewSpeedRef = useRef<number>(1)
+  const isPreviewPlaying = useEditorStore((s) => s.isPreviewPlaying)
+  const isPreviewPaused = useEditorStore((s) => s.isPreviewPaused)
+  const previewElapsedMs = useEditorStore((s) => s.previewElapsedMs)
+  const previewSpeed = useEditorStore((s) => s.previewSpeed)
 
-  // Compute scaling factors
+  // Compute scaling factors to fit mouse events into the canvas
   const getScaling = useCallback(
     (width: number, height: number) => {
-      if (!macro) return { scale: 1, offsetX: 0, offsetY: 0 }
+      if (!macro) return { scale: 1, offsetX: 0, offsetY: 0, maxX: 1920, maxY: 1080 }
       const mouseEvents = macro.events.filter(
         (e) => e.type === 'mouse_move' || e.type === 'mouse_click'
       )
@@ -29,28 +114,13 @@ export function MousePathPreview(): JSX.Element {
       const scale = Math.min(scaleX, scaleY)
       const offsetX = (width - maxX * scale) / 2
       const offsetY = (height - maxY * scale) / 2
-      return { scale, offsetX, offsetY }
+      return { scale, offsetX, offsetY, maxX, maxY }
     },
     [macro]
   )
 
-  // Draw static path
-  const drawStatic = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas || !macro) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width * window.devicePixelRatio
-    canvas.height = rect.height * window.devicePixelRatio
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
-    const width = rect.width
-    const height = rect.height
-
-    ctx.clearRect(0, 0, width, height)
-
-    // Draw background grid
+  // Draw background grid
+  const drawGrid = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
     ctx.strokeStyle = '#1a1b2e'
     ctx.lineWidth = 0.5
     for (let x = 0; x < width; x += 40) {
@@ -65,15 +135,55 @@ export function MousePathPreview(): JSX.Element {
       ctx.lineTo(width, y)
       ctx.stroke()
     }
+  }, [])
+
+  // Draw screen boundary indicator
+  const drawBoundary = useCallback(
+    (
+      ctx: CanvasRenderingContext2D,
+      scale: number,
+      offsetX: number,
+      offsetY: number,
+      maxX: number,
+      maxY: number
+    ) => {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 4])
+      ctx.strokeRect(offsetX, offsetY, maxX * scale, maxY * scale)
+      ctx.setLineDash([])
+    },
+    []
+  )
+
+  // Draw static path (when not previewing)
+  const drawStatic = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !macro) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const rect = canvas.getBoundingClientRect()
+    const dpr = window.devicePixelRatio
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
+    const width = rect.width
+    const height = rect.height
+    canvasSizeRef.current = { width, height }
+
+    ctx.clearRect(0, 0, width, height)
+    drawGrid(ctx, width, height)
 
     const mouseEvents = macro.events.filter(
       (e) => e.type === 'mouse_move' || e.type === 'mouse_click'
     )
     if (mouseEvents.length === 0) return
 
-    const { scale, offsetX, offsetY } = getScaling(width, height)
+    const { scale, offsetX, offsetY, maxX, maxY } = getScaling(width, height)
+    drawBoundary(ctx, scale, offsetX, offsetY, maxX, maxY)
 
-    // Draw path using smooth bezier curves
+    // Draw path using smooth bezier curves (midpoint technique)
     const moves = mouseEvents.filter((e) => e.type === 'mouse_move')
     if (moves.length > 1) {
       ctx.strokeStyle = 'rgba(6, 182, 212, 0.25)'
@@ -83,20 +193,20 @@ export function MousePathPreview(): JSX.Element {
       const sy = (moves[0].y ?? 0) * scale + offsetY
       ctx.moveTo(sx, sy)
       for (let i = 1; i < moves.length; i++) {
-        const prev = moves[i - 1]
         const cur = moves[i]
-        const px = (prev.x ?? 0) * scale + offsetX
-        const py = (prev.y ?? 0) * scale + offsetY
         const cx = (cur.x ?? 0) * scale + offsetX
         const cy = (cur.y ?? 0) * scale + offsetY
-        // Use quadratic bezier with midpoint control for smoother curves
-        const cpx = (px + cx) / 2
-        const cpy = (py + cy) / 2
-        ctx.quadraticCurveTo(px, py, cpx, cpy)
+        if (i < moves.length - 1) {
+          const next = moves[i + 1]
+          const nx = (next.x ?? 0) * scale + offsetX
+          const ny = (next.y ?? 0) * scale + offsetY
+          const cpx = (cx + nx) / 2
+          const cpy = (cy + ny) / 2
+          ctx.quadraticCurveTo(cx, cy, cpx, cpy)
+        } else {
+          ctx.lineTo(cx, cy)
+        }
       }
-      // Draw final segment to the last point
-      const last = moves[moves.length - 1]
-      ctx.lineTo((last.x ?? 0) * scale + offsetX, (last.y ?? 0) * scale + offsetY)
       ctx.stroke()
     }
 
@@ -125,42 +235,29 @@ export function MousePathPreview(): JSX.Element {
       }
       ctx.globalAlpha = 1
     }
-  }, [macro, selectedEventIds, getScaling])
+  }, [macro, selectedEventIds, getScaling, drawGrid, drawBoundary])
 
   // Animated preview playback frame
   const drawPreviewFrame = useCallback(
     (elapsed: number) => {
       const canvas = canvasRef.current
-      if (!canvas || !macro) return
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
+      if (!macro) return
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx) return
 
       const rect = canvas.getBoundingClientRect()
-      canvas.width = rect.width * window.devicePixelRatio
-      canvas.height = rect.height * window.devicePixelRatio
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
+      const dpr = window.devicePixelRatio
+      canvas.width = rect.width * dpr
+      canvas.height = rect.height * dpr
+      ctx.scale(dpr, dpr)
       const width = rect.width
       const height = rect.height
 
       ctx.clearRect(0, 0, width, height)
+      drawGrid(ctx, width, height)
 
-      // Background grid
-      ctx.strokeStyle = '#1a1b2e'
-      ctx.lineWidth = 0.5
-      for (let x = 0; x < width; x += 40) {
-        ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, height)
-        ctx.stroke()
-      }
-      for (let y = 0; y < height; y += 40) {
-        ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(width, y)
-        ctx.stroke()
-      }
-
-      const { scale, offsetX, offsetY } = getScaling(width, height)
+      const { scale, offsetX, offsetY, maxX, maxY } = getScaling(width, height)
+      drawBoundary(ctx, scale, offsetX, offsetY, maxX, maxY)
 
       // Find current event index
       let currentIdx = 0
@@ -189,8 +286,7 @@ export function MousePathPreview(): JSX.Element {
           const cpy = (py + cy) / 2
           ctx.beginPath()
           ctx.moveTo(px, py)
-          ctx.quadraticCurveTo(px, py, cpx, cpy)
-          ctx.lineTo(cx, cy)
+          ctx.quadraticCurveTo(cx, cy, cpx, cpy)
           ctx.stroke()
         }
       }
@@ -204,25 +300,18 @@ export function MousePathPreview(): JSX.Element {
         ctx.lineWidth = 1
         const lastPast = pastMoves[pastMoves.length - 1]
         ctx.beginPath()
-        ctx.moveTo((lastPast.x ?? 0) * scale + offsetX, (lastPast.y ?? 0) * scale + offsetY)
+        ctx.moveTo(
+          (lastPast.x ?? 0) * scale + offsetX,
+          (lastPast.y ?? 0) * scale + offsetY
+        )
         for (let i = 0; i < futureMoves.length; i++) {
-          if (i === 0) {
-            const prev = lastPast
-            const cur = futureMoves[i]
-            const px = (prev.x ?? 0) * scale + offsetX
-            const py = (prev.y ?? 0) * scale + offsetY
-            const cx = (cur.x ?? 0) * scale + offsetX
-            const cy = (cur.y ?? 0) * scale + offsetY
-            ctx.quadraticCurveTo(px, py, (px + cx) / 2, (py + cy) / 2)
-          } else {
-            const prev = futureMoves[i - 1]
-            const cur = futureMoves[i]
-            const px = (prev.x ?? 0) * scale + offsetX
-            const py = (prev.y ?? 0) * scale + offsetY
-            const cx = (cur.x ?? 0) * scale + offsetX
-            const cy = (cur.y ?? 0) * scale + offsetY
-            ctx.quadraticCurveTo(px, py, (px + cx) / 2, (py + cy) / 2)
-          }
+          const prev = i === 0 ? lastPast : futureMoves[i - 1]
+          const cur = futureMoves[i]
+          const px = (prev.x ?? 0) * scale + offsetX
+          const py = (prev.y ?? 0) * scale + offsetY
+          const cx = (cur.x ?? 0) * scale + offsetX
+          const cy = (cur.y ?? 0) * scale + offsetY
+          ctx.quadraticCurveTo(cx, cy, (px + cx) / 2, (py + cy) / 2)
         }
         const last = futureMoves[futureMoves.length - 1]
         ctx.lineTo((last.x ?? 0) * scale + offsetX, (last.y ?? 0) * scale + offsetY)
@@ -304,7 +393,7 @@ export function MousePathPreview(): JSX.Element {
         ctx.stroke()
       }
 
-      // Progress bar
+      // Progress bar at canvas bottom
       if (macro.duration > 0) {
         const progress = Math.min(1, elapsed / macro.duration)
         ctx.fillStyle = 'rgba(0,0,0,0.3)'
@@ -319,44 +408,84 @@ export function MousePathPreview(): JSX.Element {
         selectEvents([currentEvent.id])
       }
     },
-    [macro, getScaling, selectEvents]
+    [macro, getScaling, selectEvents, drawGrid, drawBoundary]
+  )
+
+  // Get current elapsed time
+  const getElapsed = useCallback((): number => {
+    const speed = useEditorStore.getState().previewSpeed
+    return pausedElapsedRef.current + (performance.now() - playStartWallRef.current) * speed
+  }, [])
+
+  // Preview control callbacks
+  const startPreview = useCallback(() => {
+    if (!macro || macro.events.length === 0) return
+    pausedElapsedRef.current = 0
+    playStartWallRef.current = performance.now()
+    const store = useEditorStore.getState()
+    store.setPreviewPlaying(true)
+    store.setPreviewPaused(false)
+    store.setPreviewElapsedMs(0)
+  }, [macro])
+
+  const pausePreview = useCallback(() => {
+    pausedElapsedRef.current = getElapsed()
+    cancelAnimationFrame(animFrameRef.current)
+    useEditorStore.getState().setPreviewPaused(true)
+  }, [getElapsed])
+
+  const resumePreview = useCallback(() => {
+    playStartWallRef.current = performance.now()
+    useEditorStore.getState().setPreviewPaused(false)
+  }, [])
+
+  const stopPreview = useCallback(() => {
+    cancelAnimationFrame(animFrameRef.current)
+    animFrameRef.current = 0
+    pausedElapsedRef.current = 0
+    const store = useEditorStore.getState()
+    store.setPreviewPlaying(false)
+    store.setPreviewPaused(false)
+    store.setPreviewElapsedMs(0)
+    drawStatic()
+  }, [drawStatic])
+
+  // Seek to a specific time (used by scrubber)
+  const handleSeek = useCallback(
+    (ms: number) => {
+      pausedElapsedRef.current = ms
+      playStartWallRef.current = performance.now()
+      useEditorStore.getState().setPreviewElapsedMs(ms)
+      // If paused or not playing, redraw frame at the seek position
+      const state = useEditorStore.getState()
+      if (!state.isPreviewPlaying || state.isPreviewPaused) {
+        drawPreviewFrame(ms)
+      }
+    },
+    [drawPreviewFrame]
   )
 
   // Animation loop
   const animatePreview = useCallback(() => {
     if (!macro) return
-    const speed = previewSpeedRef.current
-    const elapsed = (performance.now() - previewStartRef.current) * speed
+    const state = useEditorStore.getState()
+    if (state.isPreviewPaused) return
+
+    const elapsed = getElapsed()
 
     if (elapsed >= macro.duration) {
-      setIsPreviewPlaying(false)
-      drawStatic()
+      stopPreview()
       return
     }
 
+    state.setPreviewElapsedMs(elapsed)
     drawPreviewFrame(elapsed)
     animFrameRef.current = requestAnimationFrame(animatePreview)
-  }, [macro, drawPreviewFrame, drawStatic])
+  }, [macro, drawPreviewFrame, stopPreview, getElapsed])
 
-  const startPreview = useCallback(() => {
-    if (!macro || macro.events.length === 0) return
-    previewSpeedRef.current = macro.playbackSettings?.speed ?? 1
-    previewStartRef.current = performance.now()
-    setIsPreviewPlaying(true)
-  }, [macro])
-
-  const stopPreview = useCallback(() => {
-    setIsPreviewPlaying(false)
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current)
-      animFrameRef.current = 0
-    }
-    drawStatic()
-  }, [drawStatic])
-
-  // Run animation when preview is playing
+  // Start/stop RAF when play/pause state changes
   useEffect(() => {
-    if (isPreviewPlaying) {
+    if (isPreviewPlaying && !isPreviewPaused) {
       animFrameRef.current = requestAnimationFrame(animatePreview)
     }
     return () => {
@@ -364,7 +493,7 @@ export function MousePathPreview(): JSX.Element {
         cancelAnimationFrame(animFrameRef.current)
       }
     }
-  }, [isPreviewPlaying, animatePreview])
+  }, [isPreviewPlaying, isPreviewPaused, animatePreview])
 
   // Redraw static when data changes (and not previewing)
   useEffect(() => {
@@ -373,91 +502,132 @@ export function MousePathPreview(): JSX.Element {
     }
   }, [macro, selectedEventIds, isPreviewPlaying, drawStatic])
 
-  return (
-    <div
-      style={{
-        height: 160,
-        background: 'var(--bg-secondary)',
-        borderRadius: 8,
-        border: '1px solid var(--border-color)',
-        overflow: 'hidden',
-        flexShrink: 0,
-        position: 'relative'
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height: '100%', display: 'block' }}
-      />
+  const canPlay = macro ? macro.events.length > 0 : false
+  const duration = macro?.duration ?? 0
 
-      {/* Preview controls overlay */}
+  return (
+    <>
+      {/* Preview control bar */}
       <div
         style={{
-          position: 'absolute',
-          top: 6,
-          right: 6,
           display: 'flex',
-          gap: 4
+          alignItems: 'center',
+          gap: 8,
+          padding: '4px 10px',
+          background: 'var(--bg-secondary)',
+          borderRadius: 8,
+          border: '1px solid var(--border-color)',
+          flexShrink: 0,
+          minHeight: 36
         }}
       >
+        {/* Play / Pause+Resume / Stop buttons */}
         {!isPreviewPlaying ? (
-          <button
+          <CtrlBtn
             onClick={startPreview}
-            title="Preview Playback"
-            style={{
-              width: 28,
-              height: 28,
-              border: 'none',
-              borderRadius: 6,
-              background: 'rgba(6, 182, 212, 0.2)',
-              color: '#06b6d4',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(6, 182, 212, 0.35)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(6, 182, 212, 0.2)'
-            }}
+            disabled={!canPlay}
+            color="#06b6d4"
+            title="Preview playback (visual only)"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5,3 19,12 5,21" />
-            </svg>
-          </button>
+            <PlayIcon />
+          </CtrlBtn>
         ) : (
-          <button
-            onClick={stopPreview}
-            title="Stop Preview"
-            style={{
-              width: 28,
-              height: 28,
-              border: 'none',
-              borderRadius: 6,
-              background: 'rgba(239, 68, 68, 0.2)',
-              color: '#ef4444',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.35)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="4" y="4" width="16" height="16" rx="2" />
-            </svg>
-          </button>
+          <>
+            {isPreviewPaused ? (
+              <CtrlBtn onClick={resumePreview} color="#06b6d4" title="Resume preview">
+                <PlayIcon />
+              </CtrlBtn>
+            ) : (
+              <CtrlBtn onClick={pausePreview} color="#f59e0b" title="Pause preview">
+                <PauseIcon />
+              </CtrlBtn>
+            )}
+            <CtrlBtn onClick={stopPreview} color="#ef4444" title="Stop preview">
+              <StopIcon />
+            </CtrlBtn>
+          </>
         )}
+
+        {/* Seek scrubber */}
+        <input
+          type="range"
+          min={0}
+          max={duration}
+          step={10}
+          value={previewElapsedMs}
+          onChange={(e) => handleSeek(Number(e.target.value))}
+          style={{
+            flex: 1,
+            accentColor: 'var(--accent-cyan)',
+            cursor: 'pointer',
+            height: 4
+          }}
+        />
+
+        {/* Time display */}
+        <span
+          style={{
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            fontVariantNumeric: 'tabular-nums',
+            minWidth: 90,
+            textAlign: 'right',
+            fontFamily: 'monospace',
+            flexShrink: 0
+          }}
+        >
+          {formatPreviewTime(previewElapsedMs)} / {formatPreviewTime(duration)}
+        </span>
+
+        {/* Speed selector */}
+        <select
+          value={previewSpeed}
+          onChange={(e) => {
+            const newSpeed = Number(e.target.value)
+            // Preserve elapsed position when changing speed mid-playback
+            if (isPreviewPlaying && !isPreviewPaused) {
+              pausedElapsedRef.current = getElapsed()
+              playStartWallRef.current = performance.now()
+            }
+            useEditorStore.getState().setPreviewSpeed(newSpeed)
+          }}
+          style={{
+            padding: '3px 6px',
+            borderRadius: 4,
+            fontSize: 11,
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-primary)',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            flexShrink: 0
+          }}
+        >
+          {[0.25, 0.5, 1, 1.5, 2, 4].map((s) => (
+            <option key={s} value={s}>
+              {s}x
+            </option>
+          ))}
+        </select>
       </div>
-    </div>
+
+      {/* Canvas container */}
+      <div
+        style={{
+          height: 220,
+          background: 'var(--bg-secondary)',
+          borderRadius: 8,
+          border: '1px solid var(--border-color)',
+          overflow: 'hidden',
+          flexShrink: 0
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label="Mouse path visualization"
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+      </div>
+    </>
   )
 }
