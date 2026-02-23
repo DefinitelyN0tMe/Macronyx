@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAnalyticsStore } from '../../stores/analyticsStore'
 import { useMacroStore } from '../../stores/macroStore'
 import { BarChart } from './charts/BarChart'
@@ -150,7 +150,7 @@ export function OverviewTab(): JSX.Element {
           )}
         </div>
 
-        {/* Export button */}
+        {/* Export & Reset */}
         <div
           style={{
             background: 'var(--bg-secondary)',
@@ -159,18 +159,30 @@ export function OverviewTab(): JSX.Element {
             padding: 14,
             display: 'flex',
             flexDirection: 'column',
-            gap: 8
+            gap: 10
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-            Export Analytics
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+              Export Analytics
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, marginBottom: 6 }}>
+              Download all playback data for external analysis.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <ExportButton format="csv" />
+              <ExportButton format="json" />
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-            Download all playback data for external analysis.
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <ExportButton format="csv" />
-            <ExportButton format="json" />
+
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+              Reset Analytics
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, marginBottom: 6 }}>
+              Clear all playback history and statistics.
+            </div>
+            <ResetButton onReset={loadAggregate} />
           </div>
         </div>
       </div>
@@ -203,6 +215,83 @@ function OverviewStatCard({
         {value}
       </div>
     </div>
+  )
+}
+
+function ResetButton({ onReset }: { onReset: () => Promise<void> }): JSX.Element {
+  const [confirming, setConfirming] = useState(false)
+
+  const handleReset = async (): Promise<void> => {
+    try {
+      await window.api.clearAllLogs()
+      await onReset()
+      setConfirming(false)
+    } catch (err) {
+      console.error('Reset failed:', err)
+    }
+  }
+
+  if (confirming) {
+    return (
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 500 }}>Are you sure?</span>
+        <button
+          onClick={handleReset}
+          style={{
+            padding: '5px 12px',
+            border: '1px solid #ef4444',
+            borderRadius: 6,
+            background: 'rgba(239, 68, 68, 0.15)',
+            color: '#ef4444',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          Confirm
+        </button>
+        <button
+          onClick={() => setConfirming(false)}
+          style={{
+            padding: '5px 12px',
+            border: '1px solid var(--border-color)',
+            borderRadius: 6,
+            background: 'var(--bg-primary)',
+            color: 'var(--text-muted)',
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setConfirming(true)}
+      style={{
+        padding: '6px 14px',
+        border: '1px solid var(--border-color)',
+        borderRadius: 6,
+        background: 'var(--bg-primary)',
+        color: '#ef4444',
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'border-color 0.15s'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = '#ef4444'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--border-color)'
+      }}
+    >
+      Clear All Data
+    </button>
   )
 }
 

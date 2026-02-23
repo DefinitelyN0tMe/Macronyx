@@ -5,6 +5,19 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-02-23
+
+### Added
+- **Reset Analytics button** — "Clear All Data" button on the Overview tab with confirmation prompt; clears all playback logs and refreshes the dashboard
+
+### Fixed
+- **Macro played in infinite loop** — `defaultRepeatCount: 0` (corrupted by earlier settings bug) caused infinite playback. Clamped repeat count to minimum 1 in playback handler; settings UI now enforces min=1
+- **Chain pause not reflected in overlay widget** — PLAYBACK_PAUSE only paused the underlying player, not the chain player. Now routes pause/resume through `chainPlayer` when a chain is active, so `chainPlayer.isPaused` is set correctly and the chain doesn't advance to the next macro while paused
+- **Overlay widget too tall** — reduced window height from 58px to 40px; progress bar now uses column flex layout (no absolute positioning gap)
+- **Chain resumed after pause during inter-step/repeat delay** — added pause-wait loops before each macro start and after chain repeat delays
+- **Stale pause state on chain start** — `playbackPaused` is now reset to `false` when starting a new chain
+- **Emergency stop left stale counters on overlay** — success/fail counters now reset on Escape
+
 ## [1.6.0] - 2026-02-23 — "Smart Targeting & Analytics"
 
 ### Added
