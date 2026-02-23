@@ -301,7 +301,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
       const currentSettings = await settingsStorage!.get()
       macro.playbackSettings = {
         speed: currentSettings.playback.defaultSpeed,
-        repeatCount: currentSettings.playback.defaultRepeatCount,
+        repeatCount: Math.max(1, currentSettings.playback.defaultRepeatCount || 1),
         repeatDelay: currentSettings.playback.defaultRepeatDelay,
         humanize: currentSettings.playback.defaultHumanize,
         humanizeAmount: currentSettings.playback.defaultHumanizeAmount,
@@ -354,7 +354,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC.PLAYBACK_PAUSE, async () => {
     playbackPaused = true
-    player!.pause()
+    // Route through chainPlayer when a chain is active so both
+    // chainPlayer.isPaused and the underlying player are paused.
+    if (chainPlayer!.getIsPlaying()) {
+      chainPlayer!.pause()
+    } else {
+      player!.pause()
+    }
     safeSend(mainWindow, IPC.APP_STATUS, 'paused')
     updateOverlayStatus('paused')
     return { success: true }
@@ -362,7 +368,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle(IPC.PLAYBACK_RESUME, async () => {
     playbackPaused = false
-    player!.resume()
+    if (chainPlayer!.getIsPlaying()) {
+      chainPlayer!.resume()
+    } else {
+      player!.resume()
+    }
     safeSend(mainWindow, IPC.APP_STATUS, 'playing')
     updateOverlayStatus('playing')
     return { success: true }
@@ -482,6 +492,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
 
       const chain = await chainStorage!.load(chainId)
       if (!chain) return { success: false, error: 'Chain not found' }
+
+      // Reset pause state from any previous playback
+      playbackPaused = false
 
       // Load current playback settings to apply speed, humanize, repeat to the chain
       const currentSettings = await settingsStorage!.get()
@@ -927,6 +940,8 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
   hotkeyManager.setCallback('emergencyStop', () => {
     // Stop all recording/playback/chains and reset all state
     playbackPaused = false
+    playbackSuccessCount = 0
+    playbackFailedCount = 0
     recordingPausedAt = 0
     recordingAccumulatedPause = 0
     if (recorder) {

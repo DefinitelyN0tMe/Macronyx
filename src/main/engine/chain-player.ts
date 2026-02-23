@@ -54,6 +54,13 @@ export class ChainPlayer {
 
         for (let i = 0; i < enabledSteps.length; i++) {
           if (!this.isPlaying) break
+
+          // Wait while paused before starting next macro in the chain
+          while (this.isPaused && this.isPlaying) {
+            await new Promise((r) => setTimeout(r, 100))
+          }
+          if (!this.isPlaying) break
+
           this.currentStepIndex = i
 
           const step = enabledSteps[i]
@@ -122,6 +129,10 @@ export class ChainPlayer {
           const deadline = Date.now() + playbackSettings.repeatDelay
           while (Date.now() < deadline && this.isPlaying && !this.isPaused) {
             await new Promise((r) => setTimeout(r, Math.min(50, deadline - Date.now())))
+          }
+          // Wait while paused during repeat delay
+          while (this.isPaused && this.isPlaying) {
+            await new Promise((r) => setTimeout(r, 100))
           }
         }
       }

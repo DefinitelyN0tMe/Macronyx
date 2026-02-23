@@ -91,9 +91,7 @@ function OverlayWidget(): JSX.Element {
         width: '100%',
         height: '100%',
         display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '0 14px',
+        flexDirection: 'column',
         borderRadius: 10,
         background: hovered ? 'rgba(13, 17, 23, 0.95)' : 'rgba(13, 17, 23, 0.88)',
         border: `1px solid ${hovered ? config.color : 'rgba(255,255,255,0.1)'}`,
@@ -101,9 +99,21 @@ function OverlayWidget(): JSX.Element {
         transition: 'all 0.2s ease',
         boxSizing: 'border-box',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        userSelect: 'none'
+        userSelect: 'none',
+        overflow: 'hidden'
       }}
     >
+      {/* Main content row */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 14px',
+          flex: 1,
+          minHeight: 0
+        }}
+      >
       {/* Status dot with pulse animation for recording */}
       <div style={{ position: 'relative', width: 12, height: 12, flexShrink: 0 }}>
         {status === 'recording' && (
@@ -191,15 +201,15 @@ function OverlayWidget(): JSX.Element {
         <rect x="3" y="14" width="7" height="7" />
       </svg>
 
-      {/* Playback progress bar */}
+      </div>
+
+      {/* Playback progress bar — sits at the bottom of the widget */}
       {totalDurationMs > 0 && (
         <div
           style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
+            width: '100%',
             height: 3,
+            flexShrink: 0,
             borderRadius: '0 0 10px 10px',
             overflow: 'hidden'
           }}

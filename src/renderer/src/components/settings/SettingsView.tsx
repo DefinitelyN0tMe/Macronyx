@@ -348,16 +348,17 @@ function PlaybackSettings({
       </SettingRow>
       <SettingRow
         label="Default Repeat Count"
-        description={pb.defaultRepeatCount === 0 ? 'Infinite loop' : `${pb.defaultRepeatCount} time(s)`}
+        description={`${pb.defaultRepeatCount} time(s)`}
       >
         <input
           type="number"
-          min={0}
+          min={1}
           max={9999}
           value={pb.defaultRepeatCount}
-          onChange={(e) =>
-            onUpdate({ playback: { ...pb, defaultRepeatCount: Number(e.target.value) } })
-          }
+          onChange={(e) => {
+            const val = Math.max(1, Number(e.target.value) || 1)
+            onUpdate({ playback: { ...pb, defaultRepeatCount: val } })
+          }}
           style={{
             width: 80,
             padding: '4px 8px',
