@@ -5,6 +5,11 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-02-23
+
+### Added
+- **Help page** — new sidebar tab with comprehensive in-app documentation covering all features: Getting Started, Recording, Playback, Timeline Editor, Triggers & Automation, Conditional Logic, Macro Chains, Profiles, Analytics & Performance, Overlay Widget, Hotkeys Reference, Portable Mode, and Tips & Tricks. Each section is collapsible with styled headers matching the app theme
+
 ## [1.6.1] - 2026-02-23
 
 ### Added

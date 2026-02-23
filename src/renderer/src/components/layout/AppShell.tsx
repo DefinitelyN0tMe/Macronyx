@@ -10,6 +10,7 @@ import { EditorView } from '../editor/EditorView'
 import { LibraryView } from '../library/LibraryView'
 import { ChainEditor } from '../chains/ChainEditor'
 import { SettingsView } from '../settings/SettingsView'
+import { HelpView } from '../help/HelpView'
 import { useAppStore } from '../../stores/appStore'
 import { useEditorStore } from '../../stores/editorStore'
 import { useMacroStore } from '../../stores/macroStore'
@@ -235,6 +236,7 @@ export function AppShell(): JSX.Element {
           {activeView === 'library' && <LibraryView />}
           {activeView === 'chains' && <ChainEditor />}
           {activeView === 'settings' && <SettingsView />}
+          {activeView === 'help' && <HelpView />}
         </main>
       </div>
       <StatusBar />
