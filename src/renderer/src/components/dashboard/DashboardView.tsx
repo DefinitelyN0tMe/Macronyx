@@ -1,12 +1,18 @@
 import { useMacroStore } from '../../stores/macroStore'
 import { useAppStore } from '../../stores/appStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useAnalyticsStore } from '../../stores/analyticsStore'
 import { formatDuration } from '../../utils/formatTime'
+import { DashboardTabs } from './DashboardTabs'
+import { OverviewTab } from './OverviewTab'
+import { MacroAnalyticsTab } from './MacroAnalyticsTab'
+import { PerformanceTab } from './PerformanceTab'
 
 export function DashboardView(): JSX.Element {
   const macros = useMacroStore((s) => s.macros)
   const setActiveView = useAppStore((s) => s.setActiveView)
   const hotkeys = useSettingsStore((s) => s.settings.hotkeys)
+  const activeTab = useAnalyticsStore((s) => s.activeTab)
   const recentMacros = macros.slice(0, 5)
 
   return (
@@ -19,14 +25,14 @@ export function DashboardView(): JSX.Element {
           color: 'var(--text-primary)'
         }}
       >
-        Welcome to Macronyx
+        Macronyx Dashboard
       </h1>
       <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: 13 }}>
-        Record and replay mouse, keyboard, and scroll actions with precision.
+        Record, replay, and analyze your macro performance.
       </p>
 
       {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         <QuickActionCard
           title="New Recording"
           description="Start capturing mouse and keyboard"
@@ -63,8 +69,41 @@ export function DashboardView(): JSX.Element {
         />
       </div>
 
-      {/* Recent Macros */}
-      <div>
+      {/* Hotkey Quick Reference */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          padding: '10px 14px',
+          background: 'var(--bg-secondary)',
+          borderRadius: 8,
+          border: '1px solid var(--border-subtle)',
+          marginBottom: 20,
+          fontSize: 11
+        }}
+      >
+        <DashHotkeyBadge label="Record" hotkey={hotkeys.recordStart} />
+        <DashHotkeyBadge label="Stop Rec" hotkey={hotkeys.recordStop} />
+        <DashHotkeyBadge label="Pause" hotkey={hotkeys.togglePause} color="#f59e0b" />
+        <DashHotkeyBadge label="Play" hotkey={hotkeys.playStart} />
+        <DashHotkeyBadge label="Stop Play" hotkey={hotkeys.playStop} />
+        <DashHotkeyBadge label="Emergency" hotkey={hotkeys.emergencyStop} color="var(--danger)" />
+      </div>
+
+      {/* Analytics Section */}
+      <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>
+        Analytics
+      </h2>
+
+      <DashboardTabs />
+
+      {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'macro' && <MacroAnalyticsTab />}
+      {activeTab === 'performance' && <PerformanceTab />}
+
+      {/* Recent Macros — below analytics */}
+      <div style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: 'var(--text-primary)' }}>
           Recent Macros
         </h2>
@@ -136,50 +175,6 @@ export function DashboardView(): JSX.Element {
           </div>
         )}
       </div>
-
-      {/* Hotkey Quick Reference */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 16,
-          flexWrap: 'wrap',
-          padding: '10px 14px',
-          background: 'var(--bg-secondary)',
-          borderRadius: 8,
-          border: '1px solid var(--border-subtle)',
-          marginTop: 24,
-          fontSize: 11
-        }}
-      >
-        <DashHotkeyBadge label="Record" hotkey={hotkeys.recordStart} />
-        <DashHotkeyBadge label="Stop Rec" hotkey={hotkeys.recordStop} />
-        <DashHotkeyBadge label="Pause" hotkey={hotkeys.togglePause} color="#f59e0b" />
-        <DashHotkeyBadge label="Play" hotkey={hotkeys.playStart} />
-        <DashHotkeyBadge label="Stop Play" hotkey={hotkeys.playStop} />
-        <DashHotkeyBadge label="Emergency" hotkey={hotkeys.emergencyStop} color="var(--danger)" />
-      </div>
-
-      {/* Stats */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 12,
-          marginTop: 12
-        }}
-      >
-        <StatCard label="Total Macros" value={String(macros.length)} />
-        <StatCard
-          label="Total Duration"
-          value={formatDuration(macros.reduce((sum, m) => sum + m.duration, 0))}
-        />
-        <StatCard
-          label="Last Updated"
-          value={
-            macros.length > 0 ? new Date(macros[0].updatedAt).toLocaleDateString() : '—'
-          }
-        />
-      </div>
     </div>
   )
 }
@@ -248,26 +243,6 @@ function DashHotkeyBadge({ label, hotkey, color }: { label: string; hotkey: stri
       >
         {hotkey}
       </kbd>
-    </div>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: string }): JSX.Element {
-  return (
-    <div
-      style={{
-        padding: '12px 14px',
-        background: 'var(--bg-secondary)',
-        borderRadius: 8,
-        border: '1px solid var(--border-color)'
-      }}
-    >
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>
-        {value}
-      </div>
     </div>
   )
 }

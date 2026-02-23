@@ -65,7 +65,14 @@ export const IPC = {
 
   // Playback results (v1.4)
   PLAYBACK_EVENT_RESULT: 'playback:eventResult',
-  PLAYBACK_REPORT: 'playback:report'
+  PLAYBACK_REPORT: 'playback:report',
+
+  // Playback logging & analytics (v1.6)
+  LOG_GET_FOR_MACRO: 'log:getForMacro',
+  LOG_GET_AGGREGATE: 'log:getAggregate',
+  LOG_EXPORT: 'log:export',
+  LOG_CLEAR: 'log:clear',
+  LOG_CLEAR_ALL: 'log:clearAll'
 } as const
 
 export const DEFAULT_SETTINGS: AppSettings = {

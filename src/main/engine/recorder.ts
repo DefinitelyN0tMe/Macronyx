@@ -108,7 +108,7 @@ export class Recorder {
         if (current && current.processName && current.bounds) {
           event.relativeToWindow = {
             title: current.title,
-            processName: current.processName,
+            processName: current.processName.toLowerCase(), // v1.6: normalize to lowercase
             offsetX: event.x - current.bounds.x,
             offsetY: event.y - current.bounds.y,
             windowWidth: current.bounds.width,

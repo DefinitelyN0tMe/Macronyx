@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { v4 as uuid } from 'uuid'
 import * as fs from 'fs'
 import { IPC } from '../shared/constants'
-import type { Macro, MacroEvent, AppSettings, PlaybackState, MacroChain, EventResult, PlaybackReport } from '../shared/types'
+import type { Macro, MacroEvent, AppSettings, PlaybackState, MacroChain, EventResult, PlaybackReport, PlaybackLogEntry } from '../shared/types'
 import { Recorder } from './engine/recorder'
 import { Player } from './engine/player'
 import { ChainPlayer } from './engine/chain-player'
@@ -11,6 +11,7 @@ import { MacroStorage } from './storage/macros'
 import { ChainStorage } from './storage/chains'
 import { SettingsStorage } from './storage/settings'
 import { ProfileStorage } from './storage/profiles'
+import { LogStorage } from './storage/logs'
 import { ProfileSwitcher } from './engine/profile-switcher'
 import { TriggerManager } from './engine/trigger-manager'
 import { getActiveWindowService, destroyActiveWindowService } from './engine/active-window'
@@ -30,6 +31,7 @@ let settingsStorage: SettingsStorage | null = null
 let profileStorage: ProfileStorage | null = null
 let profileSwitcher: ProfileSwitcher | null = null
 let triggerManager: TriggerManager | null = null
+let logStorage: LogStorage | null = null
 let currentRecordingEvents: MacroEvent[] = []
 let recordingStartTime = 0
 let recordingPausedAt = 0
@@ -79,6 +81,32 @@ function cleanupOrphanedKeyDowns(): void {
   }
 }
 
+/** Build a PlaybackLogEntry from a PlaybackReport and persist it (v1.6) */
+function persistPlaybackLog(
+  report: PlaybackReport,
+  macroName: string,
+  trigger: PlaybackLogEntry['trigger']
+): void {
+  if (!logStorage) return
+  const entry: PlaybackLogEntry = {
+    id: uuid(),
+    macroId: report.macroId,
+    macroName,
+    startedAt: report.startedAt,
+    finishedAt: report.finishedAt,
+    durationMs: report.finishedAt - report.startedAt,
+    totalEvents: report.totalEvents,
+    successCount: report.successCount,
+    failedCount: report.failedCount,
+    skippedCount: report.skippedCount,
+    trigger,
+    eventTimings: report.eventTimings
+  }
+  logStorage.appendLog(entry).catch((err) => {
+    console.error('Failed to persist playback log:', err)
+  })
+}
+
 // NOTE: pauseActiveWindowPolling/resumeActiveWindowPolling have been REMOVED.
 // The AW service and pixel sampler now use a SEPARATE PowerShell process
 // (query-process.ts) so they can run concurrently with the input simulator
@@ -89,6 +117,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   chainStorage = new ChainStorage()
   settingsStorage = new SettingsStorage()
   profileStorage = new ProfileStorage()
+  logStorage = new LogStorage()
   recorder = new Recorder()
   player = new Player()
   chainPlayer = new ChainPlayer(player)
@@ -291,6 +320,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow): void {
         },
         (report: PlaybackReport) => {
           mainWindow.webContents.send(IPC.PLAYBACK_REPORT, report)
+          persistPlaybackLog(report, macro.name, 'manual')
         }
       )
       return { success: true }
@@ -745,6 +775,7 @@ async function startTriggerManager(mainWindow: BrowserWindow): Promise<void> {
           },
           (report: PlaybackReport) => {
             mainWindow.webContents.send(IPC.PLAYBACK_REPORT, report)
+            persistPlaybackLog(report, macro.name, 'trigger')
           }
         )
       }
@@ -849,6 +880,48 @@ function setupHotkeys(mainWindow: BrowserWindow, settings: AppSettings): void {
   })
 
   hotkeyManager.registerAll(settings.hotkeys)
+
+  // ─── Playback Logging & Analytics (v1.6) ──────────────────────────
+
+  ipcMain.handle(IPC.LOG_GET_FOR_MACRO, async (_e, macroId: string) => {
+    return logStorage!.getLogsForMacro(macroId)
+  })
+
+  ipcMain.handle(IPC.LOG_GET_AGGREGATE, async () => {
+    return logStorage!.getAggregate()
+  })
+
+  ipcMain.handle(IPC.LOG_CLEAR, async (_e, macroId: string) => {
+    await logStorage!.clearLogsForMacro(macroId)
+    return { success: true }
+  })
+
+  ipcMain.handle(IPC.LOG_CLEAR_ALL, async () => {
+    await logStorage!.clearAll()
+    return { success: true }
+  })
+
+  ipcMain.handle(IPC.LOG_EXPORT, async (_e, format: 'csv' | 'json') => {
+    const content = format === 'csv'
+      ? await logStorage!.exportAsCSV()
+      : await logStorage!.exportAsJSON()
+
+    const ext = format === 'csv' ? 'csv' : 'json'
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Analytics',
+      defaultPath: `macronyx-analytics.${ext}`,
+      filters: [
+        { name: format === 'csv' ? 'CSV Files' : 'JSON Files', extensions: [ext] }
+      ]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, error: 'Cancelled' }
+    }
+
+    await fs.promises.writeFile(result.filePath, content, 'utf-8')
+    return { success: true, path: result.filePath }
+  })
 }
 
 export function cleanupIpc(): void {

@@ -368,27 +368,9 @@ export function EventInspector(): JSX.Element {
           </div>
         )}
 
-        {/* Relative positioning info (read-only display) */}
+        {/* Relative positioning info (read-only display, v1.6) */}
         {selectedEvent.relativeToWindow && (
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-              Relative to Window
-            </div>
-            <div
-              style={{
-                padding: '6px 8px',
-                borderRadius: 6,
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                fontSize: 11,
-                color: 'var(--text-secondary)',
-                lineHeight: 1.5
-              }}
-            >
-              <div><strong>Process:</strong> {selectedEvent.relativeToWindow.processName}</div>
-              <div><strong>Offset:</strong> {selectedEvent.relativeToWindow.offsetX}, {selectedEvent.relativeToWindow.offsetY}</div>
-            </div>
-          </div>
+          <RelativePositionInfo rel={selectedEvent.relativeToWindow} />
         )}
 
         {/* Group field for single event */}
@@ -729,6 +711,111 @@ function BatchPanel({
           Delete {count} Events
         </button>
       </div>
+    </div>
+  )
+}
+
+/** Collapsible relative positioning info panel (v1.6) */
+function RelativePositionInfo({
+  rel
+}: {
+  rel: NonNullable<import('@shared/types').MacroEvent['relativeToWindow']>
+}): JSX.Element {
+  const [expanded, setExpanded] = useState(true)
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          width: '100%',
+          padding: 0,
+          border: 'none',
+          background: 'transparent',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+          fontSize: 11,
+          marginBottom: expanded ? 4 : 0,
+          textAlign: 'left'
+        }}
+      >
+        <span style={{
+          display: 'inline-block',
+          transition: 'transform 0.15s',
+          transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          fontSize: 9
+        }}>
+          ▶
+        </span>
+        <span style={{ fontWeight: 600 }}>Relative to Window</span>
+        <span style={{
+          marginLeft: 'auto',
+          padding: '1px 5px',
+          borderRadius: 3,
+          background: 'var(--accent-cyan)22',
+          color: 'var(--accent-cyan)',
+          fontSize: 9,
+          fontWeight: 600
+        }}>
+          v2
+        </span>
+      </button>
+      {expanded && (
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: 6,
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+            fontSize: 11,
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 5
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Process</span>
+            <span style={{ fontWeight: 600, fontFamily: 'monospace', color: 'var(--accent-cyan)' }}>
+              {rel.processName}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Offset X</span>
+            <span style={{ fontFamily: 'monospace' }}>{rel.offsetX}px</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Offset Y</span>
+            <span style={{ fontFamily: 'monospace' }}>{rel.offsetY}px</span>
+          </div>
+          {rel.windowWidth != null && rel.windowHeight != null && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Window Size</span>
+              <span style={{ fontFamily: 'monospace' }}>
+                {rel.windowWidth} × {rel.windowHeight}
+              </span>
+            </div>
+          )}
+          {rel.title && (
+            <div style={{
+              marginTop: 2,
+              padding: '3px 6px',
+              borderRadius: 4,
+              background: 'var(--bg-secondary)',
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {rel.title}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -105,20 +105,31 @@ public class QueryHelper {
         return r + "," + g + "," + b;
     }
 
-    // ── Window lookup by process name ──────────────────────────────
-    // Uses .NET Process.GetProcessesByName + MainWindowHandle to find
-    // a visible window belonging to a named process, even when it is
-    // NOT the foreground window. No delegates/callbacks — compiles
-    // reliably inside PowerShell Add-Type.
+    // ── Window lookup by process name (v2) ─────────────────────────
+    // Iterates ALL processes matching the name, collects all visible,
+    // titled windows, and returns the one with the LARGEST area.
+    // This handles multi-process apps like Chrome, VS Code, etc.
+    // Case-insensitive comparison. No delegates — compiles reliably.
 
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
     public static string FindWindowByProcessName(string targetProcess) {
         try {
+            string target = targetProcess.ToLowerInvariant();
             var procs = System.Diagnostics.Process.GetProcessesByName(targetProcess);
+            // If exact name match fails, try case-insensitive search
+            if (procs.Length == 0) {
+                procs = System.Diagnostics.Process.GetProcesses();
+            }
+            IntPtr bestHwnd = IntPtr.Zero;
+            string bestTitle = "";
+            string bestProcessName = "";
+            int bestArea = 0;
+            RECT bestRect = new RECT();
             foreach (var p in procs) {
                 try {
+                    if (p.ProcessName.ToLowerInvariant() != target) continue;
                     IntPtr hwnd = p.MainWindowHandle;
                     if (hwnd == IntPtr.Zero) continue;
                     if (!IsWindowVisible(hwnd)) continue;
@@ -126,15 +137,25 @@ public class QueryHelper {
                     GetWindowText(hwnd, sb, 512);
                     string title = sb.ToString();
                     if (string.IsNullOrEmpty(title)) continue;
-                    string safeTitle = title.Replace("\\\\", "\\\\\\\\").Replace("\\"", "\\\\\\"");
                     RECT rect;
                     GetWindowRect(hwnd, out rect);
-                    return "{\\"title\\":\\"" + safeTitle + "\\",\\"processName\\":\\"" + p.ProcessName +
-                           "\\",\\"hwnd\\":" + hwnd.ToInt64() +
-                           ",\\"bounds\\":{\\"x\\":" + rect.Left + ",\\"y\\":" + rect.Top +
-                           ",\\"width\\":" + (rect.Right - rect.Left) +
-                           ",\\"height\\":" + (rect.Bottom - rect.Top) + "}}";
+                    int area = (rect.Right - rect.Left) * (rect.Bottom - rect.Top);
+                    if (area > bestArea) {
+                        bestArea = area;
+                        bestHwnd = hwnd;
+                        bestTitle = title;
+                        bestProcessName = p.ProcessName;
+                        bestRect = rect;
+                    }
                 } catch {} finally { try { p.Dispose(); } catch {} }
+            }
+            if (bestHwnd != IntPtr.Zero) {
+                string safeTitle = bestTitle.Replace("\\\\", "\\\\\\\\").Replace("\\"", "\\\\\\"");
+                return "{\\"title\\":\\"" + safeTitle + "\\",\\"processName\\":\\"" + bestProcessName +
+                       "\\",\\"hwnd\\":" + bestHwnd.ToInt64() +
+                       ",\\"bounds\\":{\\"x\\":" + bestRect.Left + ",\\"y\\":" + bestRect.Top +
+                       ",\\"width\\":" + (bestRect.Right - bestRect.Left) +
+                       ",\\"height\\":" + (bestRect.Bottom - bestRect.Top) + "}}";
             }
         } catch {}
         return "{}";

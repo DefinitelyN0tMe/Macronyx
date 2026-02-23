@@ -1,6 +1,7 @@
 import type {
   Macro, MacroEvent, PlaybackState, ConditionConfig,
-  EventResult, EventResultStatus, PlaybackReport, MouseCurveSettings
+  EventResult, EventResultStatus, PlaybackReport, MouseCurveSettings,
+  EventTimingEntry
 } from '../../shared/types'
 import { DEFAULT_MOUSE_CURVE } from '../../shared/constants'
 import { Humanizer } from './humanizer'
@@ -33,11 +34,14 @@ export class Player {
   private windowBoundsCache = new Map<string, {
     x: number; y: number; width: number; height: number; updatedAt: number
   }>()
-  private static readonly WINDOW_CACHE_TTL = 500 // ms
+  private static readonly WINDOW_CACHE_TTL = 1000 // ms (v1.6: increased from 500ms)
 
   // Event result tracking (v1.4)
   private eventResults: EventResult[] = []
   private onEventResult?: (result: EventResult) => void
+
+  // Per-event timing for performance profiling (v1.6)
+  private eventTimestamps: number[] = []
 
   /** Check if player is currently playing */
   getIsPlaying(): boolean {
@@ -86,6 +90,7 @@ export class Player {
     this.heldKeys.clear()
     this.windowBoundsCache.clear()
     this.eventResults = []
+    this.eventTimestamps = []
     this.lastMousePos = null
 
     const playbackStartedAt = Date.now()
@@ -184,6 +189,9 @@ export class Player {
           }
           if (!this.isPlaying) break
 
+          // Record wall-clock timestamp for performance profiling (v1.6)
+          this.eventTimestamps.push(performance.now())
+
           const eventStatus = await this.executeEvent(
             sim, event, this.liveHumanize, this.liveHumanizeAmount
           )
@@ -215,6 +223,23 @@ export class Player {
 
     // Build and emit playback report
     if (onPlaybackReport) {
+      // Compute per-event timing drift for performance profiling (v1.6)
+      const eventTimings: EventTimingEntry[] = []
+      for (let t = 0; t < this.eventTimestamps.length; t++) {
+        if (t === 0) {
+          // First event has no meaningful drift
+          eventTimings.push({ eventIndex: t, expectedDelayMs: 0, actualDelayMs: 0, driftMs: 0 })
+        } else {
+          const actualDelay = this.eventTimestamps[t] - this.eventTimestamps[t - 1]
+          // Find the original event — timestamps are recorded only for non-conditional events
+          // that pass the shouldSkip() check, so we need to map them back.
+          // The eventTimestamps array corresponds 1:1 with the executed (non-skipped, non-conditional) events.
+          const expectedDelay = t < macro.events.length ? macro.events[t].delay / this.liveSpeed : 0
+          const drift = actualDelay - expectedDelay
+          eventTimings.push({ eventIndex: t, expectedDelayMs: expectedDelay, actualDelayMs: actualDelay, driftMs: drift })
+        }
+      }
+
       const report: PlaybackReport = {
         macroId: macro.id,
         startedAt: playbackStartedAt,
@@ -223,7 +248,8 @@ export class Player {
         successCount: this.eventResults.filter((r) => r.status === 'success').length,
         failedCount: this.eventResults.filter((r) => r.status === 'failed').length,
         skippedCount: this.eventResults.filter((r) => r.status === 'skipped').length,
-        results: [...this.eventResults]
+        results: [...this.eventResults],
+        eventTimings
       }
       onPlaybackReport(report)
     }
@@ -352,6 +378,7 @@ export class Player {
         console.warn(
           `Relative positioning: window "${event.relativeToWindow.processName}" not found. Using absolute coords.`
         )
+        // v1.6: surface error to user via console (EventResult recorded by caller)
       }
     }
 

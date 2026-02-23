@@ -256,4 +256,43 @@ export interface PlaybackReport {
   failedCount: number
   skippedCount: number
   results: EventResult[]
+  /** Per-event timing drift data for performance profiling (v1.6) */
+  eventTimings?: EventTimingEntry[]
+}
+
+// ─── Playback Logging & Analytics (v1.6) ─────────────────────────────
+
+export interface EventTimingEntry {
+  eventIndex: number
+  expectedDelayMs: number       // event.delay / speed
+  actualDelayMs: number         // measured wall-clock delta
+  driftMs: number               // actual - expected
+}
+
+export interface PlaybackLogEntry {
+  id: string                    // uuid
+  macroId: string
+  macroName: string             // snapshot at time of run
+  startedAt: number             // epoch ms
+  finishedAt: number            // epoch ms
+  durationMs: number
+  totalEvents: number
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  trigger: 'manual' | 'hotkey' | 'trigger' | 'chain'
+  /** Per-event timing drift data for performance profiling */
+  eventTimings?: EventTimingEntry[]
+}
+
+export interface AnalyticsAggregate {
+  totalPlayCount: number
+  totalTimeSavedMs: number
+  /** Per-day play counts: key = "YYYY-MM-DD", value = count */
+  dailyCounts: Record<string, number>
+  /** Per-macro play counts: key = macroId, value = count */
+  macroPlayCounts: Record<string, number>
+  /** Per-macro success rate: key = macroId */
+  macroSuccessRates: Record<string, { runs: number; fullSuccess: number }>
+  lastUpdated: number
 }

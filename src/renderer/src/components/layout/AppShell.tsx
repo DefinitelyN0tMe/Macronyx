@@ -14,6 +14,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useEditorStore } from '../../stores/editorStore'
 import { useMacroStore } from '../../stores/macroStore'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useAnalyticsStore } from '../../stores/analyticsStore'
 import type { AppStatus, Macro, EventResult, PlaybackReport } from '@shared/types'
 import {
   soundRecordStart,
@@ -85,11 +86,13 @@ export function AppShell(): JSX.Element {
     return unsub
   }, [])
 
-  // Listen for playback report (v1.4)
+  // Listen for playback report (v1.4) + refresh analytics (v1.6)
   useEffect(() => {
     const unsub = window.api.onPlaybackReport((raw) => {
       const report = raw as PlaybackReport
       useEditorStore.getState().setPlaybackReport(report)
+      // Refresh analytics aggregate so dashboard updates live
+      useAnalyticsStore.getState().refresh()
     })
     return unsub
   }, [])

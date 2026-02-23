@@ -291,8 +291,34 @@ function RecordingSettings({
           style={{ width: 120, accentColor: 'var(--accent-cyan)' }}
         />
       </SettingRow>
-      {/* Relative Positioning removed from UI — feature is experimental and
-          unreliable across multi-monitor setups. Will return in v1.6. */}
+      <SettingRow
+        label="Relative Positioning (Experimental v2)"
+        description="Record mouse positions relative to the active window. Events scale proportionally when the window resizes."
+      >
+        <Toggle
+          checked={rec.relativePositioning}
+          onChange={(v) => onUpdate({ recording: { ...rec, relativePositioning: v } })}
+        />
+      </SettingRow>
+      {rec.relativePositioning && (
+        <div
+          style={{
+            padding: '8px 12px',
+            background: 'rgba(6, 182, 212, 0.05)',
+            border: '1px solid rgba(6, 182, 212, 0.2)',
+            borderRadius: 6,
+            fontSize: 11,
+            color: 'var(--text-secondary)',
+            lineHeight: 1.5,
+            marginBottom: 8
+          }}
+        >
+          <strong style={{ color: 'var(--accent-cyan)' }}>How it works:</strong> When enabled,
+          each mouse event records its offset from the active window. During playback, the target
+          window is found by process name and coordinates are adjusted proportionally if the window
+          has moved or resized. Best for single-window applications.
+        </div>
+      )}
     </>
   )
 }
@@ -443,8 +469,8 @@ function AdvancedSettings(): JSX.Element {
 
   return (
     <>
-      <SettingRow label="Version" description="Macronyx v1.5.0">
-        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.5.0</span>
+      <SettingRow label="Version" description="Macronyx v1.6.0">
+        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>1.6.0</span>
       </SettingRow>
       <SettingRow
         label="Portable Mode"

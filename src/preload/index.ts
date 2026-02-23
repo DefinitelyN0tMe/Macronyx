@@ -139,6 +139,13 @@ const api = {
     }
   },
 
+  // Playback logging & analytics (v1.6)
+  getLogsForMacro: (macroId: string) => ipcRenderer.invoke(IPC.LOG_GET_FOR_MACRO, macroId),
+  getAggregate: () => ipcRenderer.invoke(IPC.LOG_GET_AGGREGATE),
+  clearLogs: (macroId: string) => ipcRenderer.invoke(IPC.LOG_CLEAR, macroId),
+  clearAllLogs: () => ipcRenderer.invoke(IPC.LOG_CLEAR_ALL),
+  exportAnalytics: (format: 'csv' | 'json') => ipcRenderer.invoke(IPC.LOG_EXPORT, format),
+
   // Overlay widget
   onOverlayStatus: (callback: (data: unknown) => void) => {
     const listener = (_: unknown, data: unknown): void => callback(data)

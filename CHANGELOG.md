@@ -5,6 +5,25 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-23 — "Smart Targeting & Analytics"
+
+### Added
+- **Analytics Dashboard** — replaced the simple welcome page with a full analytics dashboard featuring three tabs: Overview, Per-Macro, and Performance. Shows aggregate stats (total plays, time saved, success rate, active macros), 14-day usage bar chart, top macros by play count, and recent activity
+- **Playback Logging** — every playback run is now persistently logged to disk with timestamps, success/fail counts, trigger source, and per-event timing data. Logs survive app restarts and are capped at 500 entries per macro
+- **Performance Profiling** — timing drift analysis for each playback run. Shows mean/P95/max drift, accuracy percentage, sparkline chart of drift per event, and drift distribution histogram. Helps identify timing bottlenecks
+- **Per-Macro Analytics** — drill down into any macro's playback history with run-by-run stats, success rate donut chart, average duration, and last run timestamp
+- **Export Analytics** — export all playback logs as CSV or JSON via save dialog from the Overview tab
+- **Relative Positioning v2** — re-enabled with reliability fixes. Window detection now iterates all matching processes and picks the largest visible window (handles Chrome, VS Code, and other multi-process apps). Process name comparison is case-insensitive. Window cache TTL extended to 1000ms during playback
+- **Event Inspector: Relative Position panel** — collapsible panel in event inspector shows process name, X/Y offsets, window dimensions at recording time, and window title for events recorded with relative positioning
+
+### Changed
+- Dashboard restructured: Quick Actions and Hotkey Reference retained at top, analytics tabs below, recent macros at bottom
+- Analytics store (`analyticsStore.ts`) manages aggregate data, per-macro logs, and tab state via Zustand
+- Charts are pure CSS + SVG (bar chart, donut chart, sparkline) — no external charting dependencies
+- Analytics refresh automatically after each playback completion via AppShell listener
+- `FindWindowByProcessName` C# method upgraded to handle multi-window apps by iterating all processes and selecting the window with the largest area
+- Process names normalized to lowercase in recorder for consistent matching
+
 ## [1.5.0] - 2026-02-23 — "UI Refresh"
 
 ### Added

@@ -77,18 +77,25 @@ Modernized interface — better editor experience, improved overlay widget, and 
 
 ---
 
-## v1.6 — "Smart Targeting & Analytics"
+## v1.6 — "Smart Targeting & Analytics" *(released — v1.6.0)*
 
 Visual targeting that doesn't depend on coordinates, plus a full analytics dashboard.
 
+| Feature | Description | Size | Status |
+|---------|-------------|:----:|:------:|
+| Relative Positioning v2 | Experimental — record mouse positions relative to the active window with reliable window detection across multi-monitor setups. Includes Window-Aware Smart Scaling for proportional coordinate mapping when windows resize | L | Done |
+| Macro Analytics Dashboard | Stats: play count, total time saved, success/failure rate, most-used macros, usage over time chart | L | Done |
+| Playback Logging | Log each playback run with timestamps, errors, duration (extends v1.4 markers) | M | Done |
+| Performance Profiling | Measure timing accuracy vs expected, show drift analysis | M | Done |
+| Export Analytics | Export stats as CSV/JSON | S | Done |
+
+---
+
+## v1.7 — "Visual Targeting"
+
 | Feature | Description | Size |
 |---------|-------------|:----:|
-| Relative Positioning v2 | Experimental — record mouse positions relative to the active window with reliable window detection across multi-monitor setups. Includes Window-Aware Smart Scaling for proportional coordinate mapping when windows resize | L |
 | Visual UI Anchors | Image region matching to find UI elements regardless of window position/size — replaces coordinate-based targeting | L-XL |
-| Macro Analytics Dashboard | Stats: play count, total time saved, success/failure rate, most-used macros, usage over time chart | L |
-| Playback Logging | Log each playback run with timestamps, errors, duration (extends v1.4 markers) | M |
-| Performance Profiling | Measure timing accuracy vs expected, show drift analysis | M |
-| Export Analytics | Export stats as CSV/JSON | S |
 
 ---
 
