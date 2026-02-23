@@ -7,8 +7,8 @@ import { appState } from './app-state'
 import {
   createOverlayWindow,
   showOverlay,
-  hideOverlay,
   setOverlayEnabled,
+  setMainWindowVisible,
   destroyOverlay
 } from './overlay'
 import { IPC } from '../shared/constants'
@@ -47,20 +47,20 @@ function createWindow(): void {
     }
   })
 
-  // Show overlay when main window is hidden/minimized
+  // Track main window visibility for smart overlay show/hide.
+  // The overlay now auto-shows during active states (recording/playing/paused)
+  // and auto-hides when idle + main window is visible.
   mainWindow.on('hide', () => {
-    showOverlay()
+    setMainWindowVisible(false)
   })
   mainWindow.on('minimize', () => {
-    showOverlay()
+    setMainWindowVisible(false)
   })
-
-  // Hide overlay when main window is shown/restored
   mainWindow.on('show', () => {
-    hideOverlay()
+    setMainWindowVisible(true)
   })
   mainWindow.on('restore', () => {
-    hideOverlay()
+    setMainWindowVisible(true)
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

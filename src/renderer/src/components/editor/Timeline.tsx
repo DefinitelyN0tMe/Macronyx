@@ -26,6 +26,8 @@ export function Timeline(): JSX.Element {
   const moveEvent = useEditorStore((s) => s.moveEvent)
   const copyEvents = useEditorStore((s) => s.copyEvents)
   const pasteEvents = useEditorStore((s) => s.pasteEvents)
+  const undo = useEditorStore((s) => s.undo)
+  const redo = useEditorStore((s) => s.redo)
   const playbackResults = useEditorStore((s) => s.playbackResults)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(2000)
@@ -135,8 +137,19 @@ export function Timeline(): JSX.Element {
         e.preventDefault()
         pasteEvents()
       }
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      }
+      if (
+        (e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
+        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
+      ) {
+        e.preventDefault()
+        redo()
+      }
     },
-    [selectedEventIds, deleteEvents, selectEvents, copyEvents, pasteEvents, macro]
+    [selectedEventIds, deleteEvents, selectEvents, copyEvents, pasteEvents, undo, redo, macro]
   )
 
   // Drag sensors — require 4px movement before drag starts (prevents eating clicks)

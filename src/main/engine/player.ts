@@ -389,8 +389,9 @@ export class Player {
       this.liveMouseCurve
     )
 
-    // Distribute movement time based on distance
-    const totalTimeMs = Math.min(dist / 3, 60) / this.liveSpeed
+    // Distribute movement time based on distance — must be slow enough to see the curve.
+    // Minimum 40ms, scales with distance, caps at 250ms (before speed multiplier).
+    const totalTimeMs = Math.max(40, Math.min(dist / 1.5, 250)) / this.liveSpeed
     const stepDelay = points.length > 1 ? totalTimeMs / (points.length - 1) : 0
 
     for (let p = 0; p < points.length; p++) {

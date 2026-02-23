@@ -5,6 +5,18 @@ All notable changes to Macronyx will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-02-23
+
+### Fixed
+- **Mouse curves barely visible** — curve movement total duration was capped at 60ms (too fast to perceive). Increased timing range to 40–250ms so bezier curves are clearly visible during playback
+- **Overlay widget not showing statuses reliably** — overlay only appeared when the main window was minimized/hidden. Rewrote show/hide logic to be status-driven: overlay now auto-shows during any active state (recording/playing/paused) regardless of main window visibility, and auto-hides when idle with main window visible
+- **Ctrl+Z / Ctrl+Y not working in editor** — undo/redo keyboard shortcuts were displayed in UI hints but never wired up in the Timeline keydown handler. Added Ctrl+Z (undo), Ctrl+Y and Ctrl+Shift+Z (redo) bindings
+- **Relative Positioning removed from UI** — feature remains non-functional after multiple fix attempts (v1.3.3–v1.3.5). Removed the toggle from Settings entirely; code stays intact for future v1.6 rework. Default remains `false`
+
+### Changed
+- Roadmap restructured: old v1.5 "Smart Targeting & Analytics" moved to v1.6; new v1.5 "UI Refresh" added with editor, overlay, library, settings, and accessibility improvements
+- Relative Positioning added to v1.6 roadmap as experimental feature for future rework
+
 ## [1.4.0] - 2026-02-23 — "Smart Playback"
 
 ### Added

@@ -45,31 +45,45 @@ A living document outlining planned features, improvements, and long-term vision
 | Profile auto-switch | Automatically switch settings profiles based on active application/window (detect foreground app) | M | Done |
 | Macro chaining | Run macros sequentially — macro A then B then C | M | Done |
 | Conditional logic | If/else branching in macros (check pixel color, window title, time of day) | L | Done |
-| Relative positioning mode | Record mouse positions relative to active window *(Experimental — frozen, see v1.4 Smart Scaling)* | M | Done |
 | Playback preview | Visualize playback on MousePathPreview without actually moving the cursor | S | Done |
 | Profile management UI | Create/switch/rename/delete settings profiles from Settings → Profiles tab | M | Done |
-| v1.3.1–v1.3.5 hotfixes | Playback regression, nested conditionals, trigger reload, chain hotkeys, pause recording, relative positioning rework | M | Done |
+| v1.3.1–v1.3.5 hotfixes | Playback regression, nested conditionals, trigger reload, chain hotkeys, pause recording | M | Done |
 
 ---
 
-## v1.4 — "Smart Playback" *(current)*
+## v1.4 — "Smart Playback" *(released — v1.4.1)*
 
-Smarter, more reliable, and more realistic playback — makes macros adapt to window changes, reports playback health, and moves the mouse naturally.
+Smarter, more reliable, and more realistic playback — reports playback health and moves the mouse naturally.
 
 | Feature | Description | Size | Status |
 |---------|-------------|:----:|:------:|
-| Window-Aware Smart Scaling | Scale mouse coordinates proportionally when the target window changes size (extends relative positioning) | M | Done |
 | Success/Fail Visual Playback Markers | Per-event success/failed/skipped status during playback, overlay counter, timeline indicators, and post-playback summary | M | Done |
 | Natural Mouse Curve Editor | Bezier-based mouse movement with curvature, overshoot, and speed profile settings; replaces linear point-to-point movement | M | Done |
+| v1.4.1 hotfixes | Curve visibility, overlay reliability, Ctrl+Z binding, remove broken relative positioning | S | Done |
 
 ---
 
-## v1.5 — "Smart Targeting & Analytics"
+## v1.5 — "UI Refresh"
+
+Modernize and polish the interface — better editor experience, improved overlay widget, and overall UX enhancements.
+
+| Feature | Description | Size |
+|---------|-------------|:----:|
+| Editor UI overhaul | Redesign the timeline editor layout for better usability — improved track layout, event chip styling, better visual hierarchy, cleaner toolbar | L |
+| Overlay widget redesign | New overlay widget with richer status display, smoother animations, compact/expanded modes, and improved positioning | M |
+| Library & navigation polish | Improved sidebar navigation, better macro card design, smoother view transitions, and responsive layout improvements | M |
+| Settings UI improvements | Cleaner settings layout with better grouping, visual feedback, and inline help | S |
+| Accessibility & keyboard nav | Consistent focus states, keyboard navigation through all views, better contrast ratios | M |
+
+---
+
+## v1.6 — "Smart Targeting & Analytics"
 
 Visual targeting that doesn't depend on coordinates, plus a full analytics dashboard.
 
 | Feature | Description | Size |
 |---------|-------------|:----:|
+| Relative Positioning v2 | Experimental — record mouse positions relative to the active window with reliable window detection across multi-monitor setups. Includes Window-Aware Smart Scaling for proportional coordinate mapping when windows resize | L |
 | Visual UI Anchors | Image region matching to find UI elements regardless of window position/size — replaces coordinate-based targeting | L-XL |
 | Macro Analytics Dashboard | Stats: play count, total time saved, success/failure rate, most-used macros, usage over time chart | L |
 | Playback Logging | Log each playback run with timestamps, errors, duration (extends v1.4 markers) | M |

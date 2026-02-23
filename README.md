@@ -64,8 +64,6 @@ Record and replay mouse movements, clicks, scroll, and keyboard input with preci
   - Time of day (after/before)
   - Supports nesting (IF inside IF)
 - **Macro chaining** — run macros in sequence (A → B → C) with configurable delays between steps; drag-to-reorder, per-step enable/disable
-- **Relative positioning** — record mouse coordinates relative to the active window so macros adapt when windows move or resize
-- **Window-aware smart scaling** — mouse coordinates are proportionally scaled when the target window changes size since recording
 - **Playback preview** — animated cursor visualization on the mouse path canvas without moving the real cursor
 
 ### Profiles

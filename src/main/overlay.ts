@@ -12,6 +12,8 @@ let overlayEnabled = true
 // Playback result counters (v1.4)
 let successCount = 0
 let failedCount = 0
+// Track whether the main window is visible to the user
+let mainWindowVisible = true
 
 export function createOverlayWindow(): void {
   if (overlayWindow) return
@@ -68,6 +70,18 @@ export function setOverlayEnabled(enabled: boolean): void {
   }
 }
 
+/** Notify overlay that the main window became visible (shown/restored/focused) */
+export function setMainWindowVisible(visible: boolean): void {
+  mainWindowVisible = visible
+  if (visible && currentStatus === 'idle') {
+    // Main window visible + idle → hide overlay
+    hideOverlay()
+  } else if (!visible) {
+    // Main window hidden/minimized → always show overlay
+    showOverlay()
+  }
+}
+
 export function showOverlay(): void {
   if (!overlayEnabled) return
   if (!overlayWindow) {
@@ -92,6 +106,13 @@ export function updateOverlayStatus(status: AppStatus, elapsed?: number, totalDu
     totalDurationMs = 0
     successCount = 0
     failedCount = 0
+    // When idle and main window is visible, hide overlay
+    if (mainWindowVisible) {
+      hideOverlay()
+    }
+  } else {
+    // Active state (recording/playing/paused) — always show overlay
+    showOverlay()
   }
   sendStatusToOverlay()
 }
