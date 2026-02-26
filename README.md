@@ -141,10 +141,6 @@ See the full [Changelog](CHANGELOG.md) for details.
 </p>
 
 <p align="center">
-  <img src="assets/recording.gif" alt="Recording macro" width="900">
-</p>
-
-<p align="center">
   <img src="assets/editor.gif" alt="Timeline editor and library" width="900">
 </p>
 
