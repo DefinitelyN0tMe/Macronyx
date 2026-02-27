@@ -131,7 +131,13 @@ See the full [Changelog](CHANGELOG.md) for details.
 **[Download Latest Release](https://github.com/DefinitelyN0tMe/Macronyx/releases/latest)**
 
 > **Windows**: choose `macronyx-*-setup.exe` for the installer or `macronyx-*-portable.exe` for a single-file portable version.
+### Windows SmartScreen Warning
 
+> **Note:** On first launch, Windows Defender SmartScreen may show an "unrecognized app" warning. This happens because the app is not code-signed (certificates cost ~$300/year — not feasible for a free open-source project).
+>
+> **To proceed:** click **"More info"** → **"Run anyway"**.
+>
+> Macronyx is fully open-source — you can [inspect the code](https://github.com/DefinitelyN0tMe/Macronyx) or [build from source](#build-from-source) if you prefer.
 ---
 
 ## Screenshots
